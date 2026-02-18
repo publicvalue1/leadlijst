@@ -1,0 +1,1263 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Public Value — Leadlijst Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <!-- No external MSAL needed - using manual OAuth2 flow -->
+  <style>
+    :root{
+      --pv-dark:#0f2a2e;--pv-dark-2:#12363a;--pv-mint:#9fd6c3;--pv-mint-2:#7fcab2;
+      --pv-green:#5fbfa1;--pv-orange:#e7b65c;--pv-red:#d96b6b;--pv-blue:#6baed6;--pv-purple:#b39ddb;
+      --text-main:#ffffff;--text-soft:#cfe6de;--stroke:rgba(255,255,255,.10);
+      --shadow:0 16px 48px rgba(0,0,0,.40);--radius:22px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text-main);padding:22px;
+      background:radial-gradient(1200px 650px at 16% 0%,rgba(127,202,178,.20) 0%,rgba(15,42,46,0) 55%),
+      radial-gradient(900px 560px at 70% 10%,rgba(31,88,98,.24) 0%,rgba(15,42,46,0) 60%),var(--pv-dark);min-height:100vh;}
+    .wrap{max-width:1600px;margin:0 auto;}
+
+    /* Login screen */
+    .loginScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:24px;text-align:center;}
+    .loginScreen h2{font-size:28px;font-weight:950;color:var(--pv-mint);}
+    .loginScreen p{color:var(--text-soft);font-size:14px;max-width:400px;}
+    .loginBtn{padding:14px 28px;font-size:15px;font-weight:900;border-radius:999px;border:2px solid rgba(127,202,178,.5);
+      background:rgba(127,202,178,.15);color:var(--pv-mint);cursor:pointer;transition:all .2s;}
+    .loginBtn:hover{background:rgba(127,202,178,.3);transform:scale(1.02);}
+
+    /* Sync status */
+    .syncStatus{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.04em;
+      padding:6px 12px;border-radius:999px;background:rgba(15,42,46,.4);border:1px solid rgba(255,255,255,.08);}
+    .syncDot{width:8px;height:8px;border-radius:50%;}
+    .syncStatus.online .syncDot{background:#5fbfa1;}
+    .syncStatus.syncing .syncDot{background:#e7b65c;animation:pulse .8s infinite;}
+    .syncStatus.offline .syncDot{background:#d96b6b;}
+    .syncStatus.error .syncDot{background:#d96b6b;}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap;}
+    .brand{display:flex;align-items:center;gap:14px;min-width:280px;}
+    .pvLogo{width:86px;height:56px;flex:0 0 auto;display:block;}
+    .titleBlock{display:flex;flex-direction:column;gap:4px;}
+    .eyebrow{color:var(--text-soft);font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.92;}
+    .bigTitle{font-size:32px;font-weight:950;letter-spacing:.2px;line-height:1.0;}
+    .subtitle{color:var(--text-soft);font-size:13px;opacity:.92;}
+    .headerRight{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+
+    button{cursor:pointer;padding:10px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.12);
+      background:rgba(15,42,46,.30);color:var(--text-main);font-weight:850;letter-spacing:.2px;font-size:13px;
+      transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+    button.primary{background:rgba(127,202,178,.20);border-color:rgba(127,202,178,.40);color:var(--pv-mint);}
+    button.danger{background:rgba(217,107,107,.15);border-color:rgba(217,107,107,.35);color:var(--pv-red);}
+    button:hover{filter:brightness(1.12);}
+    .badge{background:rgba(127,202,178,.16);border:1px solid rgba(127,202,178,.35);padding:10px 12px;border-radius:999px;
+      color:var(--pv-mint);font-weight:850;letter-spacing:.2px;white-space:nowrap;box-shadow:0 10px 28px rgba(0,0,0,.20);font-size:13px;}
+
+    .card{background:linear-gradient(180deg,rgba(18,54,58,.92),rgba(18,54,58,.78));border:1px solid rgba(255,255,255,.08);
+      border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;overflow:hidden;backdrop-filter:blur(6px);margin-bottom:16px;}
+    .topline{height:6px;border-radius:999px;background:linear-gradient(90deg,rgba(159,214,195,.92),rgba(127,202,178,.92),rgba(95,191,161,.92));margin-bottom:16px;opacity:.95;}
+    .sectionTitle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;}
+    .sectionTitle h2{margin:0;font-size:14px;letter-spacing:.10em;text-transform:uppercase;font-weight:900;color:var(--pv-mint);}
+    .sectionTitle .note{font-size:12px;color:var(--text-soft);opacity:.9;}
+
+    .upload-area{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.12);border-radius:12px;
+      padding:10px 14px;background:rgba(15,42,46,.30);cursor:pointer;transition:all .2s;font-size:13px;font-weight:600;}
+    .upload-area:hover{filter:brightness(1.07);background:rgba(127,202,178,.20);border-color:rgba(127,202,178,.40);color:var(--pv-mint);}
+    input[type="file"]{display:none;}
+
+    /* KPI */
+    .kpiRow{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px;}
+    .kpiBox{border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:18px 20px;
+      background:linear-gradient(180deg,rgba(15,42,46,.35),rgba(15,42,46,.18));}
+    .kpiLabel{font-size:11px;letter-spacing:.10em;text-transform:uppercase;font-weight:800;color:var(--text-soft);opacity:.9;margin-bottom:8px;}
+    .kpiValue{font-size:28px;font-weight:950;line-height:1;font-variant-numeric:tabular-nums;}
+    .kpiSub{font-size:12px;color:var(--text-soft);opacity:.9;margin-top:6px;font-variant-numeric:tabular-nums;}
+
+    /* Grid */
+    .chartsGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+    .chartsGridFull{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px;}
+    @media(max-width:960px){.chartsGrid{grid-template-columns:1fr;}}
+    .chartBox{min-height:300px;position:relative;}
+    .chartBox canvas{max-height:340px;}
+
+    /* Funnel */
+    .funnelWrap{display:flex;flex-direction:column;gap:10px;padding:10px 0;}
+    .funnelStep{display:flex;align-items:center;gap:14px;}
+    .funnelBar{height:44px;border-radius:10px;display:flex;align-items:center;padding:0 16px;
+      font-weight:800;font-size:14px;min-width:60px;transition:width .6s ease;position:relative;overflow:hidden;}
+    .funnelBar::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 70%,rgba(255,255,255,.06));border-radius:10px;}
+    .funnelLabel{font-size:12px;color:var(--text-soft);min-width:180px;white-space:nowrap;}
+    .funnelValue{font-size:11px;color:var(--text-soft);opacity:.85;min-width:80px;text-align:right;}
+
+    /* Timeline */
+    .timelineWrap{position:relative;padding:16px 0 0;}
+    .timelineMonth{display:grid;grid-template-columns:120px 1fr 100px;align-items:center;gap:14px;
+      padding:14px 0;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;transition:background .15s;
+      border-radius:10px;margin:0 -8px;padding-left:8px !important;padding-right:8px !important;}
+    .timelineMonth:last-child{border-bottom:none;}
+    .timelineMonth:hover{background:rgba(127,202,178,.06);}
+    .timelineMonthLabel{font-weight:800;font-size:14px;color:var(--pv-mint);}
+    .timelineMonthLabel .year{font-size:11px;font-weight:600;color:var(--text-soft);opacity:.7;display:block;}
+    .timelineBarOuter{height:36px;background:rgba(255,255,255,.04);border-radius:10px;position:relative;overflow:hidden;}
+    .timelineBarInner{height:100%;border-radius:10px;display:flex;align-items:center;padding:0 12px;
+      font-weight:800;font-size:13px;transition:width .6s ease;min-width:0;position:relative;}
+    .timelineBarInner.confirmed{background:linear-gradient(90deg,rgba(95,191,161,.6),rgba(127,202,178,.5));color:#fff;}
+    .timelineBarInner.pipeline{background:linear-gradient(90deg,rgba(231,182,92,.4),rgba(231,182,92,.25));color:var(--pv-orange);position:absolute;top:0;}
+    .timelineAmount{text-align:right;font-weight:900;font-size:14px;font-variant-numeric:tabular-nums;}
+    .timelineAmount .sub{display:block;font-size:11px;font-weight:600;color:var(--text-soft);opacity:.7;}
+    .timelineLegend{display:flex;gap:16px;margin-bottom:16px;padding-left:4px;}
+    .legendItem{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-soft);}
+    .legendToggle{cursor:pointer;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.1);transition:all .2s;user-select:none;}
+    .legendToggle:hover{background:rgba(255,255,255,.06);}
+    .legendToggle.active{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);}
+    .legendToggle:not(.active){opacity:.4;}
+    .legendDot{width:12px;height:12px;border-radius:4px;}
+    .legendDot.confirmed{background:rgba(95,191,161,.6);}
+    .legendDot.pipeline{background:rgba(231,182,92,.4);}
+    .legendDot.potential{background:rgba(179,157,219,.4);}
+    .timelineBarInner.potential{background:linear-gradient(90deg,rgba(179,157,219,.35),rgba(179,157,219,.2));color:var(--pv-purple);position:absolute;top:0;}
+    .currentMonth .timelineMonthLabel{color:#fff;}
+    .currentMonth{background:rgba(127,202,178,.06) !important;}
+
+    /* Contact alerts */
+    .alertSection{margin-bottom:0;}
+    .alertList{display:flex;flex-direction:column;gap:6px;}
+    .alertItem{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;
+      background:rgba(15,42,46,.3);border:1px solid rgba(255,255,255,.06);transition:all .15s;cursor:pointer;}
+    .alertItem:hover{background:rgba(127,202,178,.08);}
+    .alertItem.overdue{border-color:rgba(217,107,107,.35);background:rgba(217,107,107,.08);}
+    .alertItem.upcoming{border-color:rgba(231,182,92,.3);background:rgba(231,182,92,.06);}
+    .alertItem.today{border-color:rgba(107,174,214,.4);background:rgba(107,174,214,.08);}
+    .alertDot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+    .alertDot.overdue{background:var(--pv-red);}
+    .alertDot.upcoming{background:var(--pv-orange);}
+    .alertDot.today{background:var(--pv-blue);}
+    .alertName{font-weight:700;font-size:13px;flex:1;}
+    .alertMeta{font-size:11px;color:var(--text-soft);text-align:right;white-space:nowrap;}
+    .alertBadge{font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;letter-spacing:.03em;}
+    .alertBadge.overdue{background:rgba(217,107,107,.2);color:var(--pv-red);}
+    .alertBadge.upcoming{background:rgba(231,182,92,.2);color:var(--pv-orange);}
+    .alertBadge.today{background:rgba(107,174,214,.2);color:var(--pv-blue);}
+    .noAlerts{color:var(--text-soft);opacity:.6;font-size:13px;padding:12px 0;}
+
+    /* Filters + table */
+    .filterRow{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+    .filterRow label{font-size:12px;color:var(--text-soft);font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
+    select,.searchInput{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);
+      background:rgba(15,42,46,.5);color:var(--text-main);font-size:13px;font-weight:600;outline:none;transition:all .2s;}
+    select:focus,.searchInput:focus{border-color:rgba(127,202,178,.5);background:rgba(15,42,46,.7);}
+    .searchInput{min-width:220px;}
+    select{cursor:pointer;-webkit-appearance:none;appearance:none;padding-right:28px;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239fd6c3' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;}
+    select option{background:#12363a;color:#fff;}
+    .tableWrap{overflow-x:auto;margin-top:8px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    thead th{padding:10px 12px;text-align:left;font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+      color:var(--pv-mint);border-bottom:2px solid rgba(127,202,178,.3);white-space:nowrap;position:sticky;top:0;
+      background:rgba(18,54,58,.98);z-index:2;cursor:pointer;user-select:none;}
+    thead th:hover{color:#fff;}
+    thead th .sortArrow{font-size:10px;margin-left:4px;opacity:.5;}
+    thead th.sorted .sortArrow{opacity:1;color:var(--pv-mint);}
+    tbody tr{border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;cursor:pointer;}
+    tbody tr:hover{background:rgba(127,202,178,.08);}
+    tbody td{padding:10px 12px;vertical-align:top;max-width:220px;}
+
+    .statusPill{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;letter-spacing:.02em;}
+    .status-1{background:rgba(107,174,214,.18);color:#6baed6;border:1px solid rgba(107,174,214,.3);}
+    .status-2{background:rgba(231,182,92,.18);color:#e7b65c;border:1px solid rgba(231,182,92,.3);}
+    .status-3{background:rgba(179,157,219,.18);color:#b39ddb;border:1px solid rgba(179,157,219,.3);}
+    .status-4{background:rgba(159,214,195,.18);color:#9fd6c3;border:1px solid rgba(159,214,195,.3);}
+    .winloss-win{background:rgba(95,191,161,.18);color:var(--pv-green);border:1px solid rgba(95,191,161,.3);}
+    .winloss-loss{background:rgba(217,107,107,.18);color:var(--pv-red);border:1px solid rgba(217,107,107,.3);}
+
+    /* Modal */
+    .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;
+      justify-content:center;padding:20px;backdrop-filter:blur(4px);}
+    .modalOverlay.active{display:flex;}
+    .modal{background:linear-gradient(180deg,#12363a,#0f2a2e);border:1px solid rgba(127,202,178,.2);
+      border-radius:var(--radius);padding:28px;max-width:640px;width:100%;box-shadow:0 32px 80px rgba(0,0,0,.6);
+      max-height:90vh;overflow-y:auto;}
+    .modal h3{font-size:18px;font-weight:900;color:var(--pv-mint);margin-bottom:20px;}
+    .formGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    .formGroup{display:flex;flex-direction:column;gap:4px;}
+    .formGroup.full{grid-column:1/-1;}
+    .formGroup label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-soft);}
+    .formGroup input,.formGroup select,.formGroup textarea{background:rgba(15,42,46,.6);border:1px solid rgba(255,255,255,.12);
+      border-radius:10px;color:#fff;padding:10px 12px;font-size:13px;font-family:inherit;outline:none;transition:border-color .2s;}
+    .formGroup input:focus,.formGroup select:focus,.formGroup textarea:focus{border-color:rgba(127,202,178,.5);}
+    .formGroup textarea{resize:vertical;min-height:60px;}
+    .modalActions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end;}
+
+    /* Lead detail modal */
+    .detailGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+    .detailField{display:flex;flex-direction:column;gap:2px;}
+    .detailField.full{grid-column:1/-1;}
+    .detailLabel{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-soft);opacity:.8;}
+    .detailValue{font-size:14px;font-weight:600;}
+    .detailDivider{grid-column:1/-1;height:1px;background:rgba(255,255,255,.08);margin:4px 0;}
+
+    /* Month detail */
+    .monthDetailHeader{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:20px;
+      padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08);}
+    .monthDetailTotals{display:flex;gap:20px;}
+    .monthDetailTotal{text-align:center;}
+    .monthDetailTotal .val{font-size:22px;font-weight:950;font-variant-numeric:tabular-nums;}
+    .monthDetailTotal .lbl{font-size:11px;color:var(--text-soft);letter-spacing:.06em;text-transform:uppercase;font-weight:700;margin-top:2px;}
+    .monthDetailTable{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+    .monthDetailTable th{padding:8px 12px;text-align:left;font-weight:800;font-size:11px;letter-spacing:.06em;
+      text-transform:uppercase;color:var(--pv-mint);border-bottom:1px solid rgba(127,202,178,.2);}
+    .monthDetailTable td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.04);}
+
+    .emptyState{text-align:center;padding:60px 20px;}
+    .emptyState .emptyIcon{font-size:48px;margin-bottom:16px;opacity:.6;}
+    .emptyState h3{font-size:20px;font-weight:900;color:var(--pv-mint);margin-bottom:8px;}
+    .emptyState p{color:var(--text-soft);font-size:14px;max-width:400px;margin:0 auto;}
+
+    .toast{position:fixed;bottom:24px;right:24px;background:rgba(18,54,58,.96);border:1px solid rgba(127,202,178,.3);
+      border-radius:14px;padding:14px 20px;font-size:13px;font-weight:700;color:var(--pv-mint);z-index:200;
+      box-shadow:0 12px 40px rgba(0,0,0,.5);transform:translateY(100px);opacity:0;transition:all .3s ease;}
+    .toast.show{transform:translateY(0);opacity:1;}
+
+    ::-webkit-scrollbar{width:6px;height:6px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:rgba(127,202,178,.25);border-radius:999px;}
+
+    @media(max-width:640px){.bigTitle{font-size:24px;}.kpiRow{grid-template-columns:1fr 1fr;}
+      .formGrid{grid-template-columns:1fr;}.funnelLabel{min-width:120px;font-size:11px;}
+      .detailGrid{grid-template-columns:1fr;}.timelineMonth{grid-template-columns:90px 1fr 80px;}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <!-- LOGIN SCREEN -->
+  <div id="loginScreen" class="loginScreen">
+    <svg class="pvLogo" viewBox="0 0 180 120" style="width:140px;height:90px;">
+      <text x="0" y="48" font-size="44" font-weight="800" fill="var(--pv-mint)">Public</text>
+      <text x="0" y="100" font-size="44" font-weight="800" fill="var(--pv-mint)">Value</text>
+      <line x1="76" y1="60" x2="92" y2="36" stroke="var(--pv-mint)" stroke-width="8" stroke-linecap="round" opacity=".95"/>
+    </svg>
+    <h2>Leadlijst Dashboard</h2>
+    <p>Log in met je Public Value Microsoft-account om de leadlijst te openen vanuit SharePoint.</p>
+    <button class="loginBtn" onclick="doLogin()">🔐 Inloggen met Microsoft</button>
+    <div style="margin-top:12px;">
+      <label class="upload-area" for="fileInput" style="opacity:.7;font-size:12px;"><span>📂</span><span>Of importeer lokaal een Excel</span></label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+    </div>
+    <div id="loginError" style="color:var(--pv-red);font-size:13px;display:none;margin-top:8px;"></div>
+  </div>
+
+  <!-- MAIN APP (hidden until logged in or local import) -->
+  <div id="mainApp" style="display:none;">
+  <header>
+    <div class="brand">
+      <svg class="pvLogo" viewBox="0 0 180 120" aria-label="Public Value logo">
+        <rect x="0" y="0" width="180" height="120" fill="none"/>
+        <text x="0" y="48" font-size="44" font-weight="800" fill="var(--pv-mint)">Public</text>
+        <text x="0" y="100" font-size="44" font-weight="800" fill="var(--pv-mint)">Value</text>
+        <line x1="76" y1="60" x2="92" y2="36" stroke="var(--pv-mint)" stroke-width="8" stroke-linecap="round" opacity=".95"/>
+      </svg>
+      <div class="titleBlock">
+        <span class="eyebrow">Sales Pipeline</span>
+        <div class="bigTitle">Leadlijst Dashboard</div>
+        <span class="subtitle" id="subtitleDate">Geen data geladen</span>
+      </div>
+    </div>
+    <div class="headerRight">
+      <div class="syncStatus offline" id="syncStatus"><div class="syncDot"></div><span id="syncLabel">Offline</span></div>
+      <span class="badge" id="badgeCount">—</span>
+      <span id="userName" style="font-size:12px;color:var(--text-soft);"></span>
+      <button class="primary" onclick="openAddModal()">＋ Nieuwe lead</button>
+      <button onclick="syncToSharePoint()">☁ Opslaan naar SharePoint</button>
+      <button onclick="loadFromSharePoint()">🔄 Vernieuwen</button>
+      <button onclick="exportToExcel()">⬇ Export Excel</button>
+    </div>
+  </header>
+
+  <div id="emptyState" class="emptyState" style="display:none;">
+    <div class="emptyIcon">📊</div>
+    <h3>Geen data gevonden</h3>
+    <p>Klik op 🔄 Vernieuwen om opnieuw te laden vanuit SharePoint.</p>
+  </div>
+
+  <div id="dashboardContent" style="display:none;">
+    <!-- KPIs -->
+    <div class="kpiRow" id="kpiRow">
+      <div class="kpiBox"><div class="kpiLabel">Lopende opdrachten</div><div class="kpiValue" id="kpiWins">0</div><div class="kpiSub" id="kpiWinsSub">—</div></div>
+      <div class="kpiBox"><div class="kpiLabel">Leads in pipeline</div><div class="kpiValue" id="kpiLeads">0</div><div class="kpiSub" id="kpiLeadsSub">—</div></div>
+      <div class="kpiBox"><div class="kpiLabel">Bevestigde omzet</div><div class="kpiValue" id="kpiConfirmed">€ 0</div><div class="kpiSub" id="kpiConfirmedSub">—</div></div>
+      <div class="kpiBox"><div class="kpiLabel">Gewogen omzet</div><div class="kpiValue" id="kpiWeighted">€ 0</div><div class="kpiSub" id="kpiWeightedSub">—</div></div>
+      <div class="kpiBox"><div class="kpiLabel">Potentiële omzet</div><div class="kpiValue" id="kpiPotential">€ 0</div><div class="kpiSub" id="kpiPotentialSub">—</div></div>
+    </div>
+
+    <!-- CONTACT ALERTS -->
+    <div class="card alertSection" id="alertCard" style="display:none;">
+      <div class="topline" style="background:linear-gradient(90deg,rgba(217,107,107,.8),rgba(231,182,92,.8),rgba(107,174,214,.6));"></div>
+      <div class="sectionTitle">
+        <h2>⚡ Opvolging contactmomenten</h2>
+        <span class="note" id="alertNote">—</span>
+      </div>
+      <div class="alertList" id="alertList"></div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="chartsGridFull">
+      <div class="card">
+        <div class="topline"></div>
+        <div class="sectionTitle"><h2>Omzetprognose komende maanden</h2><span class="note">o.b.v. lopende opdrachten &amp; pipeline</span></div>
+        <div class="timelineLegend">
+          <div class="legendItem legendToggle active" id="toggleConfirmed" onclick="toggleTimelineFilter('confirmed')"><div class="legendDot confirmed"></div> Bevestigd (Win)</div>
+          <div class="legendItem legendToggle active" id="togglePipeline" onclick="toggleTimelineFilter('pipeline')"><div class="legendDot pipeline"></div> Pipeline (gewogen)</div>
+          <div class="legendItem legendToggle" id="togglePotential" onclick="toggleTimelineFilter('potential')"><div class="legendDot potential"></div> Potentieel (100%)</div>
+        </div>
+        <div id="timelineWrap" class="timelineWrap"></div>
+      </div>
+    </div>
+
+    <!-- FUNNEL + PARTNER LEADS -->
+    <div class="chartsGrid">
+      <div class="card">
+        <div class="topline"></div>
+        <div class="sectionTitle"><h2>Sales Funnel</h2><span class="note">Alleen leads (excl. wins)</span></div>
+        <div class="funnelWrap" id="funnelWrap"></div>
+      </div>
+      <div class="card">
+        <div class="topline"></div>
+        <div class="sectionTitle"><h2>Leads per Partner</h2><span class="note">Pipeline verdeling</span></div>
+        <div class="chartBox"><canvas id="partnerLeadsChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- PARTNER WINS + TOP KLANTEN -->
+    <div class="chartsGrid">
+      <div class="card">
+        <div class="topline"></div>
+        <div class="sectionTitle"><h2>Lopende opdrachten per Partner</h2><span class="note">Gewonnen omzet</span></div>
+        <div class="chartBox"><canvas id="partnerWinsChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="topline"></div>
+        <div class="sectionTitle"><h2>Top Klanten</h2><span class="note">Naar totale waarde</span></div>
+        <div class="chartBox"><canvas id="clientChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card">
+      <div class="topline"></div>
+      <div class="sectionTitle"><h2>Alle Leads &amp; Opdrachten</h2><span class="note" id="tableCount">—</span></div>
+      <div class="filterRow">
+        <label>Filter:</label>
+        <select id="filterStatus" onchange="renderTable()">
+          <option value="">Alle statussen</option>
+          <option value="1 - Geïdentificeerd">1 - Geïdentificeerd</option>
+          <option value="2 - Besproken">2 - Besproken</option>
+          <option value="3 - Offerte uitgebracht in concurrentie">3 - Offerte in concurrentie</option>
+          <option value="4 - Offerte uitgebracht zonder concurrentie">4 - Offerte zonder concurrentie</option>
+        </select>
+        <select id="filterPartner" onchange="renderTable()"><option value="">Alle partners</option></select>
+        <select id="filterType" onchange="renderTable()">
+          <option value="">Alles</option>
+          <option value="win">Lopende opdrachten</option>
+          <option value="pipeline">Leads (pipeline)</option>
+          <option value="loss">Losses</option>
+        </select>
+        <input class="searchInput" type="text" id="searchBox" placeholder="🔍 Zoek klant of opdracht…" oninput="renderTable()" />
+      </div>
+      <div class="tableWrap" style="max-height:600px;overflow-y:auto;">
+        <table><thead><tr id="tableHead"></tr></thead><tbody id="tableBody"></tbody></table>
+      </div>
+    </div>
+
+    <!-- LOSS OVERVIEW -->
+    <div class="card" id="lossCard" style="display:none;">
+      <div class="topline" style="background:linear-gradient(90deg,rgba(217,107,107,.7),rgba(217,107,107,.4));"></div>
+      <div class="sectionTitle"><h2>Losses</h2><span class="note" id="lossNote">—</span></div>
+      <div class="tableWrap" style="max-height:350px;overflow-y:auto;">
+        <table>
+          <thead><tr>
+            <th>Klant</th><th>Opdracht</th><th>Partner</th><th>Status</th><th style="text-align:right;">Honorarium</th><th>Opmerking</th><th style="width:90px;"></th>
+          </tr></thead>
+          <tbody id="lossBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /mainApp -->
+</div><!-- /wrap -->
+
+<!-- ADD/EDIT MODAL -->
+<div class="modalOverlay" id="modalOverlay" onclick="if(event.target===this)closeModal();">
+  <div class="modal">
+    <h3 id="modalTitle">Nieuwe lead toevoegen</h3>
+    <div class="formGrid">
+      <div class="formGroup"><label>Klant</label><input type="text" id="fKlant" /></div>
+      <div class="formGroup"><label>Partner</label><select id="fPartner">
+        </select></div>
+      <div class="formGroup full"><label>Omschrijving opdracht</label><input type="text" id="fOmschrijving" /></div>
+      <div class="formGroup"><label>Status</label><select id="fStatus">
+        <option value="1 - Geïdentificeerd">1 - Geïdentificeerd</option><option value="2 - Besproken">2 - Besproken</option>
+        <option value="3 - Offerte uitgebracht in concurrentie">3 - Offerte in concurrentie</option>
+        <option value="4 - Offerte uitgebracht zonder concurrentie">4 - Offerte zonder concurrentie</option></select></div>
+      <div class="formGroup"><label>Win / Loss</label><select id="fWinLoss"><option value="">Open</option><option value="Win">Win</option><option value="Loss">Loss</option></select></div>
+      <div class="formGroup"><label>Startdatum</label><input type="date" id="fStart" /></div>
+      <div class="formGroup"><label>Einddatum</label><input type="date" id="fEind" /></div>
+      <div class="formGroup"><label>Honorarium (€)</label><input type="number" id="fHonorarium" min="0" step="100" /></div>
+      <div class="formGroup"><label>Bestaande / Nieuwe klant</label><select id="fKlantType">
+        <option value="">—</option><option value="Bestaande klant">Bestaande klant</option><option value="Nieuwe klant">Nieuwe klant</option></select></div>
+      <div class="formGroup"><label>Laatste keer contact</label><input type="date" id="fLaatsteContact" /></div>
+      <div class="formGroup"><label>Eerstvolgende contact</label><input type="date" id="fVolgendeContact" /></div>
+      <div class="formGroup full"><label>Opmerking / follow-up</label><textarea id="fOpmerking"></textarea></div>
+    </div>
+    <div class="modalActions">
+      <button onclick="closeModal()">Annuleren</button>
+      <button class="primary" onclick="saveLead()">💾 Opslaan</button>
+      <button class="danger" id="btnDeleteLead" onclick="deleteLead()" style="display:none;">🗑 Verwijderen</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEAD DETAIL MODAL -->
+<div class="modalOverlay" id="detailOverlay" onclick="if(event.target===this)closeDetail();">
+  <div class="modal" style="max-width:580px;">
+    <h3 id="detailTitle">—</h3>
+    <div class="detailGrid" id="detailGrid"></div>
+    <div class="modalActions">
+      <button onclick="closeDetail()">Sluiten</button>
+      <button class="primary" id="detailEditBtn" onclick="">✏️ Bewerken</button>
+      <button class="danger" id="detailLossBtn" style="display:none;" onclick="">✗ Markeer als Loss</button>
+    </div>
+  </div>
+</div>
+
+<!-- MONTH DETAIL MODAL -->
+<div class="modalOverlay" id="monthModalOverlay" onclick="if(event.target===this)closeMonthModal();">
+  <div class="modal" style="max-width:720px;">
+    <div class="monthDetailHeader">
+      <h3 id="monthModalTitle">—</h3>
+      <div class="monthDetailTotals">
+        <div class="monthDetailTotal"><div class="val" id="mmConfirmed" style="color:var(--pv-green);">—</div><div class="lbl">Bevestigd</div></div>
+        <div class="monthDetailTotal"><div class="val" id="mmPipeline" style="color:var(--pv-orange);">—</div><div class="lbl">Gewogen</div></div>
+        <div class="monthDetailTotal"><div class="val" id="mmPotential" style="color:var(--pv-purple);">—</div><div class="lbl">Potentieel</div></div>
+        <div class="monthDetailTotal"><div class="val" id="mmTotal">—</div><div class="lbl">Totaal</div></div>
+      </div>
+    </div>
+    <div style="max-height:400px;overflow-y:auto;">
+      <table class="monthDetailTable"><thead><tr><th>Klant</th><th>Opdracht</th><th>Status</th><th style="text-align:right;">Potentieel</th><th style="text-align:right;">Gewogen</th></tr></thead>
+      <tbody id="monthModalBody"></tbody></table>
+    </div>
+    <div class="modalActions" style="margin-top:16px;"><button onclick="closeMonthModal()">Sluiten</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let leads = [];
+let editIndex = -1;
+let sortCol = -1;
+let sortAsc = true;
+let showConfirmed = true;
+let showPipeline = true;
+let showPotential = false;
+let cachedMonths = [];
+
+const PARTNERS_DEFAULT = [];
+const STATUS_COLORS = {
+  '1 - Geïdentificeerd':                        {bg:'rgba(107,174,214,.55)',text:'#6baed6'},
+  '2 - Besproken':                               {bg:'rgba(231,182,92,.55)',text:'#e7b65c'},
+  '3 - Offerte uitgebracht in concurrentie':     {bg:'rgba(179,157,219,.55)',text:'#b39ddb'},
+  '4 - Offerte uitgebracht zonder concurrentie': {bg:'rgba(159,214,195,.55)',text:'#9fd6c3'},
+};
+const STATUS_WINKANS = {'1 - Geïdentificeerd':.10,'2 - Besproken':.25,'3 - Offerte uitgebracht in concurrentie':.40,'4 - Offerte uitgebracht zonder concurrentie':.70};
+const STATUS_SHORT = {'1 - Geïdentificeerd':'1 - Geïdentificeerd','2 - Besproken':'2 - Besproken',
+  '3 - Offerte uitgebracht in concurrentie':'3 - Offerte in concurrentie','4 - Offerte uitgebracht zonder concurrentie':'4 - Offerte zonder concurrentie'};
+const MONTH_NAMES = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+const COLORS = ['#9fd6c3','#7fcab2','#5fbfa1','#e7b65c','#6baed6','#b39ddb','#d96b6b','#e0a060','#80cbc4','#a5d6a7'];
+
+const TABLE_COLS = [
+  {key:'klant',label:'Klant'},{key:'omschrijving',label:'Opdracht'},{key:'partner',label:'Partner'},
+  {key:'status',label:'Status'},{key:'winloss',label:'Type'},{key:'honorarium',label:'Honorarium'},
+  {key:'verwacht',label:'Gewogen'},{key:'volgendeContact',label:'Volgende contact'},{key:'opmerking',label:'Opmerking'},
+];
+
+/* ── SharePoint / Graph API Config ── */
+const GRAPH_CONFIG = {
+  clientId: 'cdc27541-133d-48b6-87b3-31daf4540b6d',
+  tenantId: 'cdf9d3c0-44dc-4ad3-aac0-33ee899e0e50',
+  siteHost: 'publicvalue.sharepoint.com',
+  sitePath: '/sites/Algemeen',
+  filePath: '/General/leadlijst.xlsx',
+  sheetName: 'Leads',
+};
+
+let graphToken = null;
+let isOnline = false;
+let currentUserName = '';
+
+const REDIRECT_URI = 'https://publicvalue1.github.io/leadlijst/';
+const AUTH_URL = `https://login.microsoftonline.com/${GRAPH_CONFIG.tenantId}/oauth2/v2.0/authorize`;
+const SCOPES = 'Files.ReadWrite.All Sites.ReadWrite.All User.Read';
+
+/* ── OAuth2 Token Flow ── */
+function checkForToken(){
+  // Check URL hash for token (after redirect back)
+  const hash = window.location.hash;
+  if(hash && hash.includes('access_token')){
+    const params = new URLSearchParams(hash.substring(1));
+    graphToken = params.get('access_token');
+    isOnline = true;
+    // Clean URL
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    return true;
+  }
+  // Check sessionStorage for existing token
+  try {
+    const saved = sessionStorage.getItem('pv_graph_token');
+    if(saved){
+      const data = JSON.parse(saved);
+      if(data.expires > Date.now()){
+        graphToken = data.token;
+        isOnline = true;
+        return true;
+      }
+    }
+  } catch(e){}
+  return false;
+}
+
+function saveToken(){
+  try {
+    sessionStorage.setItem('pv_graph_token', JSON.stringify({
+      token: graphToken,
+      expires: Date.now() + 3500000
+    }));
+  } catch(e){}
+}
+
+function doLogin(){
+  const nonce = Math.random().toString(36).substring(2);
+  const params = new URLSearchParams({
+    client_id: GRAPH_CONFIG.clientId,
+    response_type: 'token',
+    redirect_uri: REDIRECT_URI,
+    scope: SCOPES,
+    response_mode: 'fragment',
+    prompt: 'select_account',
+    nonce: nonce,
+  });
+  window.location.href = AUTH_URL + '?' + params.toString();
+}
+
+async function onLoginSuccess(){
+  saveToken();
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  
+  // Get user name
+  try {
+    const resp = await graphFetch('https://graph.microsoft.com/v1.0/me');
+    const me = await resp.json();
+    currentUserName = me.displayName || me.userPrincipalName || '';
+    document.getElementById('userName').textContent = currentUserName;
+  } catch(e){}
+
+  setSyncStatus('syncing','Laden vanuit SharePoint…');
+  try {
+    await loadFromSharePoint();
+    // Dynamically populate partners from loaded data
+    populatePartnersFromData();
+    setSyncStatus('online','Verbonden met SharePoint');
+  } catch(err) {
+    console.error('Load from SP failed:', err);
+    setSyncStatus('error','SharePoint laden mislukt: ' + err.message);
+    if(loadFromLocalStorage()) { refreshAll(); toast('⚠️ Offline modus — data uit cache'); }
+  }
+}
+
+function showLoginError(msg){
+  const el = document.getElementById('loginError');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function populatePartnersFromData(){
+  // Extract unique partners from loaded leads
+  const partners = new Set();
+  leads.forEach(l => { if(l.partner) partners.add(l.partner); });
+  if(partners.size === 0) return;
+  PARTNERS_DEFAULT.length = 0;
+  partners.forEach(p => PARTNERS_DEFAULT.push(p));
+  // Populate dropdown
+  const sel = document.getElementById('editPartner');
+  if(sel){
+    sel.innerHTML = '<option value="">— Kies —</option>';
+    PARTNERS_DEFAULT.forEach(p => {
+      sel.innerHTML += `<option value="${p}">${p}</option>`;
+    });
+  }
+}
+
+function setSyncStatus(state, label){
+  const el = document.getElementById('syncStatus');
+  el.className = 'syncStatus ' + state;
+  document.getElementById('syncLabel').textContent = label;
+}
+
+/* ── Graph API helpers ── */
+async function graphFetch(url, options = {}){
+  if(!graphToken) throw new Error('Niet ingelogd');
+  const resp = await fetch(url, {
+    ...options,
+    headers: { 'Authorization': 'Bearer ' + graphToken, ...(options.headers || {}) }
+  });
+  if(resp.status === 401){
+    // Token expired, re-login
+    doLogin();
+    throw new Error('Token verlopen, opnieuw inloggen...');
+  }
+  if(!resp.ok) {
+    const txt = await resp.text();
+    throw new Error(`Graph API ${resp.status}: ${txt}`);
+  }
+  return resp;
+}
+
+let siteId = null;
+let driveId = null;
+let fileItemId = null;
+
+async function resolveSiteAndFile(){
+  if(siteId && driveId && fileItemId) return;
+
+  // Get site ID
+  const siteResp = await graphFetch(`https://graph.microsoft.com/v1.0/sites/${GRAPH_CONFIG.siteHost}:${GRAPH_CONFIG.sitePath}`);
+  const siteData = await siteResp.json();
+  siteId = siteData.id;
+
+  // Get default drive
+  const driveResp = await graphFetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/drive`);
+  const driveData = await driveResp.json();
+  driveId = driveData.id;
+
+  // Get file by path
+  const fileResp = await graphFetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/root:${GRAPH_CONFIG.filePath}`);
+  const fileData = await fileResp.json();
+  fileItemId = fileData.id;
+}
+
+/* ── Load from SharePoint ── */
+async function loadFromSharePoint(){
+  setSyncStatus('syncing','Laden…');
+  await resolveSiteAndFile();
+
+  // Download the file content
+  const dlResp = await graphFetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/items/${fileItemId}/content`);
+  const buf = await dlResp.arrayBuffer();
+
+  // Parse with SheetJS
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  const ws = wb.Sheets[GRAPH_CONFIG.sheetName] || wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  leads = rows.map(parseRow).filter(r => r.klant.trim() !== '');
+
+  saveToLocalStorage();
+  refreshAll();
+  setSyncStatus('online','Verbonden — ' + leads.length + ' items');
+  toast('☁ ' + leads.length + ' items geladen vanuit SharePoint');
+}
+
+/* ── Save to SharePoint ── */
+async function syncToSharePoint(){
+  if(!isOnline){toast('⚠️ Niet verbonden met SharePoint');return;}
+  setSyncStatus('syncing','Opslaan…');
+  try {
+    await resolveSiteAndFile();
+
+    // Build Excel workbook
+    const rows = leads.map(leadToRow);
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, GRAPH_CONFIG.sheetName);
+    const wbout = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+
+    // Upload (overwrite)
+    await graphFetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/items/${fileItemId}/content`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      body: wbout,
+    });
+
+    saveToLocalStorage();
+    setSyncStatus('online','Opgeslagen ✓');
+    toast('☁ Opgeslagen naar SharePoint');
+  } catch(err) {
+    console.error('Sync error:', err);
+    setSyncStatus('error','Opslaan mislukt');
+    toast('❌ Opslaan mislukt: ' + err.message);
+  }
+}
+
+function leadToRow(l){
+  return {
+    'Klant': l.klant, 'Bestaande klant / nieuwe klant': l.klantType,
+    'Nieuwe opdracht / vervolgopdracht': l.opdrachtType, 'Omschrijving opdracht': l.omschrijving,
+    'Partner': l.partner, 'Status': l.status, 'Laatste keer contact': l.laatsteContact,
+    'Eerstvolgende keer contact': l.volgendeContact, 'Opmerking/follow-up': l.opmerking,
+    'Startdatum': l.startdatum, 'Einddatum': l.einddatum, 'Honorarium': l.honorarium || '',
+    'Winkans': l.winkans, 'Win/loss': l.winloss, 'Verwachte omzet': l.verwacht
+  };
+}
+
+/* ── Auto-sync: save to SharePoint on every change ── */
+let syncTimeout = null;
+function saveAndSync(){
+  saveToLocalStorage();
+  if(!isOnline) return;
+  // Debounce: wait 2 seconds after last change before syncing
+  clearTimeout(syncTimeout);
+  setSyncStatus('syncing','Wijzigingen opslaan…');
+  syncTimeout = setTimeout(() => syncToSharePoint(), 2000);
+}
+
+/* ── Local Storage (offline cache) ── */
+function saveToLocalStorage(){try{localStorage.setItem('pv_leads_v3',JSON.stringify(leads));}catch(e){}}
+function loadFromLocalStorage(){try{const d=localStorage.getItem('pv_leads_v3');if(d){leads=JSON.parse(d);return true;}}catch(e){}return false;}
+
+/* ── Local Excel Import (fallback) ── */
+document.getElementById('fileInput').addEventListener('change',function(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      leads=rows.map(parseRow).filter(r=>r.klant.trim()!=='');
+      saveToLocalStorage();
+      // Show main app if on login screen
+      document.getElementById('loginScreen').style.display='none';
+      document.getElementById('mainApp').style.display='block';
+      setSyncStatus('offline','Lokaal bestand');
+      refreshAll();
+      toast('✅ '+leads.length+' items geïmporteerd (lokaal)');
+    }catch(err){toast('❌ Fout: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);e.target.value='';
+});
+
+function parseRow(r){
+  const g=(keys)=>{for(const k of keys){if(r[k]!==undefined&&r[k]!=='')return r[k];}return '';};
+  const hon=parseFloat(g(['Honorarium']))||0;
+  const status=String(g(['Status'])||'');
+  const wl=String(g(['Win/loss','Win/Loss'])||'');
+  const winkans=wl==='Win'?1:(STATUS_WINKANS[status]||0);
+  const verwacht=wl==='Win'?hon:hon*winkans;
+  return {
+    klant:String(g(['Klant'])),klantType:String(g(['Bestaande klant / nieuwe klant'])),
+    opdrachtType:String(g(['Nieuwe opdracht / vervolgopdracht'])),omschrijving:String(g(['Omschrijving opdracht'])),
+    partner:String(g(['Partner'])),status,
+    laatsteContact:fmtDate(g(['Laatste keer contact'])),volgendeContact:fmtDate(g(['Eerstvolgende keer contact'])),
+    opmerking:String(g(['Opmerking/follow-up'])),startdatum:fmtDate(g(['Startdatum'])),einddatum:fmtDate(g(['Einddatum'])),
+    honorarium:hon,winkans,winloss:wl,verwacht,
+  };
+}
+
+function fmtDate(v){
+  if(!v)return '';
+  if(v instanceof Date){const y=v.getFullYear(),m=String(v.getMonth()+1).padStart(2,'0'),d=String(v.getDate()).padStart(2,'0');return`${y}-${m}-${d}`;}
+  const s=String(v);if(s.match(/^\d{4}-\d{2}-\d{2}/))return s.split('T')[0].split(' ')[0];return s;
+}
+
+/* ── Export ── */
+function exportToExcel(){
+  if(!leads.length){toast('Geen data');return;}
+  const rows=leads.map(leadToRow);
+  const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Leads');
+  XLSX.writeFile(wb,new Date().toISOString().split('T')[0].replace(/-/g,'')+'_Leadlijst_Public_Value.xlsx');
+  toast('📥 Excel geëxporteerd');
+}
+
+/* ── Refresh ── */
+function refreshAll(){
+  const has=leads.length>0;
+  document.getElementById('emptyState').style.display=has?'none':'block';
+  document.getElementById('dashboardContent').style.display=has?'block':'none';
+  if(!has){document.getElementById('badgeCount').textContent='—';return;}
+  document.getElementById('subtitleDate').textContent='Laatste update: '+new Date().toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
+  const wins=leads.filter(l=>l.winloss==='Win');
+  const pipeline=leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss');
+  document.getElementById('badgeCount').textContent=wins.length+' opdrachten · '+pipeline.length+' leads';
+  updatePartnerFilter();renderKPIs();renderAlerts();renderTimeline();renderFunnel();
+  renderPartnerLeadsChart();renderPartnerWinsChart();renderClientChart();renderTable();renderLosses();
+}
+
+/* ── KPIs ── */
+function renderKPIs(){
+  const wins=leads.filter(l=>l.winloss==='Win');
+  const pipeline=leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss');
+  const confirmedRev=wins.reduce((s,l)=>s+l.honorarium,0);
+  const pipelineHon=pipeline.reduce((s,l)=>s+l.honorarium,0);
+  const weightedRev=pipeline.reduce((s,l)=>s+l.verwacht,0);
+
+  document.getElementById('kpiWins').textContent=wins.length;
+  document.getElementById('kpiWinsSub').textContent=fmtEuro(confirmedRev)+' bevestigde omzet';
+  document.getElementById('kpiLeads').textContent=pipeline.length;
+  document.getElementById('kpiLeadsSub').textContent='verdeeld over '+[...new Set(pipeline.map(l=>l.partner).filter(Boolean))].length+' partners';
+  document.getElementById('kpiConfirmed').textContent=fmtEuro(confirmedRev);
+  document.getElementById('kpiConfirmedSub').textContent=wins.length+' gewonnen opdrachten';
+  document.getElementById('kpiWeighted').textContent=fmtEuro(confirmedRev+weightedRev);
+  document.getElementById('kpiWeightedSub').textContent='bevestigd + pipeline gewogen naar winkans';
+  document.getElementById('kpiPotential').textContent=fmtEuro(confirmedRev+pipelineHon);
+  document.getElementById('kpiPotentialSub').textContent='als alles gewonnen wordt';
+}
+
+function fmtEuro(v){if(!v&&v!==0)return'—';return'€ '+Math.round(v).toLocaleString('nl-NL');}
+
+/* ── Contact Alerts ── */
+function renderAlerts(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const alerts=[];
+
+  leads.forEach((l,idx)=>{
+    if(l.winloss==='Win')return; // only pipeline leads
+    if(!l.volgendeContact)return;
+    const d=new Date(l.volgendeContact);d.setHours(0,0,0,0);
+    const diff=Math.round((d-today)/(1000*60*60*24));
+    let type,label;
+    if(diff<0){type='overdue';label=Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' verlopen';}
+    else if(diff===0){type='today';label='Vandaag';}
+    else if(diff<=7){type='upcoming';label='Over '+diff+' dag'+(diff!==1?'en':'');}
+    else return;
+    alerts.push({idx,lead:l,type,label,diff,date:l.volgendeContact});
+  });
+
+  // Sort: overdue first (most overdue first), then today, then upcoming
+  alerts.sort((a,b)=>a.diff-b.diff);
+
+  const card=document.getElementById('alertCard');
+  const list=document.getElementById('alertList');
+  const note=document.getElementById('alertNote');
+
+  if(alerts.length===0){card.style.display='none';return;}
+  card.style.display='block';
+  const overdue=alerts.filter(a=>a.type==='overdue').length;
+  const todayCount=alerts.filter(a=>a.type==='today').length;
+  const upcoming=alerts.filter(a=>a.type==='upcoming').length;
+  const parts=[];
+  if(overdue)parts.push(overdue+' verlopen');
+  if(todayCount)parts.push(todayCount+' vandaag');
+  if(upcoming)parts.push(upcoming+' komende week');
+  note.textContent=parts.join(' · ');
+
+  list.innerHTML=alerts.map(a=>`
+    <div class="alertItem ${a.type}" onclick="openDetail(${a.idx})">
+      <div class="alertDot ${a.type}"></div>
+      <div class="alertName">${esc(a.lead.klant)}${a.lead.omschrijving?' — '+esc(a.lead.omschrijving):''}</div>
+      <div class="alertMeta">${fmtDateNL(a.date)}</div>
+      <span class="alertBadge ${a.type}">${a.label}</span>
+    </div>
+  `).join('');
+}
+
+function fmtDateNL(d){
+  if(!d)return'—';
+  const dt=new Date(d);
+  return dt.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'});
+}
+
+/* ── Timeline ── */
+function getMonthlyRevenue(){
+  const now=new Date();const currentY=now.getFullYear();const currentM=now.getMonth();
+  const months=[];
+  for(let i=0;i<12;i++){let m=currentM+i;let y=currentY;if(m>=12){m-=12;y++;}months.push({month:m,year:y,confirmed:0,pipeline:0,potential:0,leads:[]});}
+  const ym=(y,m)=>y*12+m;const firstYM=ym(months[0].year,months[0].month);const lastYM=ym(months[11].year,months[11].month);
+
+  leads.forEach(l=>{
+    if(!l.honorarium||l.honorarium<=0)return;
+    const isWin=l.winloss==='Win';
+    const start=l.startdatum?new Date(l.startdatum):null;
+    const end=l.einddatum?new Date(l.einddatum):null;
+
+    if(start&&end&&end>=start){
+      const startY=start.getFullYear(),startM=start.getMonth();
+      const endY=end.getFullYear(),endM=end.getMonth();
+      const totalMonths=(endY-startY)*12+(endM-startM)+1;
+      const monthlyHon=l.honorarium/totalMonths;
+      const monthlyVerwacht=l.verwacht/totalMonths;
+      for(let i=0;i<totalMonths;i++){
+        const mIdx=startM+i;const my=startY+Math.floor(mIdx/12);const mm=mIdx%12;
+        const thisYM=ym(my,mm);if(thisYM<firstYM||thisYM>lastYM)continue;
+        const slot=months.find(s=>s.year===my&&s.month===mm);
+        if(slot){
+          if(isWin){slot.confirmed+=monthlyHon;slot.leads.push({name:l.klant,omschrijving:l.omschrijving,amount:monthlyHon,amountPotential:monthlyHon,isWin,idx:leads.indexOf(l)});}
+          else{slot.pipeline+=monthlyVerwacht;slot.potential+=monthlyHon;slot.leads.push({name:l.klant,omschrijving:l.omschrijving,amount:monthlyVerwacht,amountPotential:monthlyHon,isWin,idx:leads.indexOf(l)});}
+        }
+      }
+    }else if(start){
+      const sYM=ym(start.getFullYear(),start.getMonth());
+      if(sYM>=firstYM&&sYM<=lastYM){
+        const slot=months.find(s=>s.year===start.getFullYear()&&s.month===start.getMonth());
+        if(slot){if(isWin){slot.confirmed+=l.honorarium;slot.leads.push({name:l.klant,omschrijving:l.omschrijving,amount:l.honorarium,amountPotential:l.honorarium,isWin,idx:leads.indexOf(l)});}
+          else{slot.pipeline+=l.verwacht;slot.potential+=l.honorarium;slot.leads.push({name:l.klant,omschrijving:l.omschrijving,amount:l.verwacht,amountPotential:l.honorarium,isWin,idx:leads.indexOf(l)});}}
+      }
+    }else{
+      if(isWin){months[0].confirmed+=l.honorarium;months[0].leads.push({name:l.klant,omschrijving:l.omschrijving,amount:l.honorarium,amountPotential:l.honorarium,isWin:true,idx:leads.indexOf(l)});}
+      else if(l.verwacht>0){const spread=Math.min(3,months.length);const pm=l.verwacht/spread;const pmPot=l.honorarium/spread;
+        for(let i=0;i<spread;i++){months[i].pipeline+=pm;months[i].potential+=pmPot;months[i].leads.push({name:l.klant,omschrijving:l.omschrijving,amount:pm,amountPotential:pmPot,isWin:false,idx:leads.indexOf(l)});}}
+    }
+  });
+  return months;
+}
+
+function toggleTimelineFilter(type){
+  if(type==='confirmed')showConfirmed=!showConfirmed;
+  if(type==='pipeline')showPipeline=!showPipeline;
+  if(type==='potential')showPotential=!showPotential;
+  document.getElementById('toggleConfirmed').classList.toggle('active',showConfirmed);
+  document.getElementById('togglePipeline').classList.toggle('active',showPipeline);
+  document.getElementById('togglePotential').classList.toggle('active',showPotential);
+  renderTimeline();
+}
+
+function renderTimeline(){
+  cachedMonths=getMonthlyRevenue();const months=cachedMonths;
+  const wrap=document.getElementById('timelineWrap');
+  const now=new Date();const currentM=now.getMonth();const currentY=now.getFullYear();
+  const getVal=m=>{
+    let v=0;if(showConfirmed)v+=m.confirmed;
+    if(showPotential)v+=m.potential;else if(showPipeline)v+=m.pipeline;
+    return v;};
+  const maxVal=Math.max(...months.map(getVal),1);
+
+  wrap.innerHTML=months.map((m,i)=>{
+    const confirmed=showConfirmed?m.confirmed:0;
+    const pipeline=showPipeline&&!showPotential?m.pipeline:0;
+    const potential=showPotential?m.potential:0;
+    const barTop=Math.max(pipeline,potential);
+    const total=confirmed+barTop;
+    const confirmedPct=confirmed>0?(confirmed/maxVal*100):0;
+    const pipelinePct=(confirmed+pipeline)>0?((confirmed+pipeline)/maxVal*100):0;
+    const potentialPct=(confirmed+potential)>0?((confirmed+potential)/maxVal*100):0;
+    const isCurrent=m.month===currentM&&m.year===currentY;
+
+    return`<div class="timelineMonth ${isCurrent?'currentMonth':''}" onclick="openMonthDetail(${i})">
+      <div class="timelineMonthLabel">${MONTH_NAMES[m.month]}<span class="year">${m.year}</span></div>
+      <div class="timelineBarOuter">
+        ${potential>0?`<div class="timelineBarInner potential" style="width:${Math.max(potentialPct,2)}%;left:0;"></div>`:''}
+        ${pipeline>0?`<div class="timelineBarInner pipeline" style="width:${Math.max(pipelinePct,2)}%;left:0;"></div>`:''}
+        ${confirmed>0?`<div class="timelineBarInner confirmed" style="width:${Math.max(confirmedPct,2)}%;">${confirmedPct>15?fmtEuro(confirmed):''}</div>`:''}
+      </div>
+      <div class="timelineAmount">${total>0?fmtEuro(total):'<span style="opacity:.3;">—</span>'}
+        ${confirmed>0&&barTop>0?`<span class="sub">${fmtEuro(confirmed)} bevestigd</span>`:''}
+      </div></div>`;
+  }).join('');
+}
+
+function openMonthDetail(idx){
+  const m=cachedMonths[idx];if(!m)return;
+  document.getElementById('monthModalTitle').textContent=MONTH_NAMES[m.month]+' '+m.year;
+  document.getElementById('mmConfirmed').textContent=fmtEuro(m.confirmed);
+  document.getElementById('mmPipeline').textContent=fmtEuro(m.pipeline);
+  document.getElementById('mmPotential').textContent=fmtEuro(m.potential);
+  document.getElementById('mmTotal').textContent=fmtEuro(m.confirmed+m.potential);
+  const body=document.getElementById('monthModalBody');
+  if(!m.leads.length){body.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text-soft);padding:24px;">Geen opdrachten</td></tr>';}
+  else{body.innerHTML=m.leads.map(l=>`<tr style="cursor:pointer;" onclick="closeMonthModal();openDetail(${l.idx})">
+    <td style="font-weight:700;">${esc(l.name)}</td>
+    <td style="color:var(--text-soft);">${esc(l.omschrijving||'')}</td>
+    <td>${l.isWin?'<span class="statusPill winloss-win">Lopend</span>':'<span class="statusPill status-2" style="font-size:10px;">Pipeline</span>'}</td>
+    <td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-soft);">${fmtEuro(l.amountPotential)}</td>
+    <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${fmtEuro(l.amount)}</td>
+    </tr>`).join('');}
+  document.getElementById('monthModalOverlay').classList.add('active');
+}
+function closeMonthModal(){document.getElementById('monthModalOverlay').classList.remove('active');}
+
+/* ── Funnel (pipeline only) ── */
+function renderFunnel(){
+  const wrap=document.getElementById('funnelWrap');
+  const pipeline=leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss');
+  const stages=Object.keys(STATUS_COLORS);
+  const data=stages.map(s=>{const items=pipeline.filter(l=>l.status===s);return{status:s,count:items.length,value:items.reduce((sum,l)=>sum+l.honorarium,0)};});
+  const maxCount=Math.max(...data.map(d=>d.count),1);
+  wrap.innerHTML=data.map(d=>{
+    const pct=Math.max(d.count/maxCount*100,8);const c=STATUS_COLORS[d.status];const short=STATUS_SHORT[d.status]||d.status;
+    return`<div class="funnelStep"><div class="funnelLabel">${short}</div>
+      <div class="funnelBar" style="width:${pct}%;background:${c.bg};color:${c.text};">${d.count}</div>
+      <div class="funnelValue">${fmtEuro(d.value)}</div></div>`;
+  }).join('');
+}
+
+/* ── Charts ── */
+let chartPartnerLeads=null,chartPartnerWins=null,chartClient=null;
+
+function renderPartnerLeadsChart(){
+  const ctx=document.getElementById('partnerLeadsChart').getContext('2d');
+  if(chartPartnerLeads)chartPartnerLeads.destroy();
+  const pipeline=leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss');
+  const partners={};
+  pipeline.forEach(l=>{if(!l.partner)return;if(!partners[l.partner])partners[l.partner]={count:0,value:0};partners[l.partner].count++;partners[l.partner].value+=l.honorarium;});
+  const sorted=Object.entries(partners).sort((a,b)=>b[1].value-a[1].value);
+  chartPartnerLeads=new Chart(ctx,{type:'bar',
+    data:{labels:sorted.map(s=>s[0]),datasets:[{label:'Pipeline waarde',data:sorted.map(s=>s[1].value),
+      backgroundColor:COLORS.slice(0,sorted.length).map(c=>c+'cc'),borderColor:COLORS.slice(0,sorted.length),borderWidth:1,borderRadius:8}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtEuro(ctx.raw)+' ('+sorted[ctx.dataIndex][1].count+' leads)'}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#cfe6de',callback:v=>fmtEuro(v)}},
+        y:{grid:{display:false},ticks:{color:'#fff',font:{weight:700}}}}}
+  });
+}
+
+function renderPartnerWinsChart(){
+  const ctx=document.getElementById('partnerWinsChart').getContext('2d');
+  if(chartPartnerWins)chartPartnerWins.destroy();
+  const wins=leads.filter(l=>l.winloss==='Win');
+  const partners={};
+  wins.forEach(l=>{if(!l.partner)return;if(!partners[l.partner])partners[l.partner]={count:0,value:0};partners[l.partner].count++;partners[l.partner].value+=l.honorarium;});
+  const sorted=Object.entries(partners).sort((a,b)=>b[1].value-a[1].value);
+  if(!sorted.length){
+    chartPartnerWins=new Chart(ctx,{type:'bar',data:{labels:['Geen data'],datasets:[{data:[0],backgroundColor:'rgba(255,255,255,.05)'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}});return;}
+  chartPartnerWins=new Chart(ctx,{type:'bar',
+    data:{labels:sorted.map(s=>s[0]),datasets:[{label:'Omzet',data:sorted.map(s=>s[1].value),
+      backgroundColor:sorted.map((_,i)=>COLORS[i%COLORS.length]+'cc'),borderColor:sorted.map((_,i)=>COLORS[i%COLORS.length]),borderWidth:1,borderRadius:8}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtEuro(ctx.raw)+' ('+sorted[ctx.dataIndex][1].count+' opdrachten)'}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#cfe6de',callback:v=>fmtEuro(v)}},
+        y:{grid:{display:false},ticks:{color:'#fff',font:{weight:700}}}}}
+  });
+}
+
+function renderClientChart(){
+  const ctx=document.getElementById('clientChart').getContext('2d');
+  if(chartClient)chartClient.destroy();
+  const clients={};leads.forEach(l=>{if(!l.klant)return;if(!clients[l.klant])clients[l.klant]=0;clients[l.klant]+=l.honorarium;});
+  const sorted=Object.entries(clients).filter(c=>c[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  chartClient=new Chart(ctx,{type:'bar',
+    data:{labels:sorted.map(s=>s[0].length>28?s[0].slice(0,26)+'…':s[0]),
+      datasets:[{label:'Waarde',data:sorted.map(s=>s[1]),backgroundColor:COLORS.map(c=>c+'aa'),borderColor:COLORS,borderWidth:1,borderRadius:8}]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtEuro(ctx.raw)}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,.06)'},ticks:{color:'#cfe6de',callback:v=>fmtEuro(v)}},
+        y:{grid:{display:false},ticks:{color:'#fff',font:{weight:600,size:11}}}}}
+  });
+}
+
+/* ── Table ── */
+function updatePartnerFilter(){
+  const sel=document.getElementById('filterPartner');const cur=sel.value;
+  const partners=[...new Set(leads.map(l=>l.partner).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Alle partners</option>'+partners.map(p=>`<option value="${p}">${p}</option>`).join('');
+  sel.value=cur;
+}
+
+function getFilteredLeads(){
+  const status=document.getElementById('filterStatus').value;
+  const partner=document.getElementById('filterPartner').value;
+  const type=document.getElementById('filterType').value;
+  const search=document.getElementById('searchBox').value.toLowerCase();
+  return leads.filter(l=>{
+    if(status&&l.status!==status)return false;
+    if(partner&&l.partner!==partner)return false;
+    if(type==='win'&&l.winloss!=='Win')return false;
+    if(type==='pipeline'&&(l.winloss==='Win'||l.winloss==='Loss'))return false;
+    if(type==='loss'&&l.winloss!=='Loss')return false;
+    if(type===''&&l.winloss==='Loss')return false;
+    if(search&&!(l.klant.toLowerCase().includes(search)||l.omschrijving.toLowerCase().includes(search)||l.opmerking.toLowerCase().includes(search)))return false;
+    return true;
+  });
+}
+
+function renderTable(){
+  const filtered=getFilteredLeads();
+  document.getElementById('tableCount').textContent=filtered.length+' resultaten';
+  const head=document.getElementById('tableHead');
+  head.innerHTML=TABLE_COLS.map((c,i)=>{
+    const s=sortCol===i;const arrow=s?(sortAsc?'▲':'▼'):'⇅';
+    return`<th class="${s?'sorted':''}" onclick="toggleSort(${i})">${c.label} <span class="sortArrow">${arrow}</span></th>`;
+  }).join('');
+
+  let sorted=[...filtered];
+  if(sortCol>=0){const key=TABLE_COLS[sortCol].key;
+    sorted.sort((a,b)=>{let va=a[key],vb=b[key];if(typeof va==='number'&&typeof vb==='number')return sortAsc?va-vb:vb-va;
+      va=String(va||'').toLowerCase();vb=String(vb||'').toLowerCase();return sortAsc?va.localeCompare(vb):vb.localeCompare(va);});}
+
+  const body=document.getElementById('tableBody');
+  body.innerHTML=sorted.map(l=>{
+    const idx=leads.indexOf(l);
+    const contactClass=getContactClass(l.volgendeContact);
+    return`<tr onclick="openDetail(${idx})">
+      <td style="font-weight:700;">${esc(l.klant)||'—'}</td>
+      <td>${esc(l.omschrijving)||'—'}</td>
+      <td>${esc(l.partner)||'—'}</td>
+      <td>${statusPill(l.status)}</td>
+      <td>${l.winloss==='Win'?'<span class="statusPill winloss-win">Lopend</span>':l.winloss==='Loss'?'<span class="statusPill winloss-loss">Loss</span>':'<span style="color:var(--text-soft);font-size:12px;">Lead</span>'}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;">${l.honorarium?fmtEuro(l.honorarium):'—'}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-soft);">${l.verwacht?fmtEuro(l.verwacht):'—'}</td>
+      <td style="font-size:12px;" class="${contactClass}">${l.volgendeContact?fmtDateNL(l.volgendeContact):'—'}</td>
+      <td style="font-size:12px;color:var(--text-soft);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(l.opmerking)}">${esc(l.opmerking)||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function getContactClass(d){
+  if(!d)return'';const today=new Date();today.setHours(0,0,0,0);
+  const dt=new Date(d);dt.setHours(0,0,0,0);const diff=Math.round((dt-today)/(86400000));
+  if(diff<0)return'color:var(--pv-red);font-weight:700;';
+  if(diff===0)return'color:var(--pv-blue);font-weight:700;';
+  if(diff<=7)return'color:var(--pv-orange);font-weight:600;';
+  return'';
+}
+
+function toggleSort(i){if(sortCol===i)sortAsc=!sortAsc;else{sortCol=i;sortAsc=true;}renderTable();}
+
+function statusPill(s){if(!s)return'<span class="statusPill" style="opacity:.3;">—</span>';
+  const num=s.charAt(0);const short=STATUS_SHORT[s]||s;return`<span class="statusPill status-${num}">${short}</span>`;}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ── Lead detail modal ── */
+function openDetail(idx){
+  const l=leads[idx];if(!l)return;
+  document.getElementById('detailTitle').textContent=l.klant;
+  const isWin=l.winloss==='Win';
+  const grid=document.getElementById('detailGrid');
+
+  grid.innerHTML=`
+    <div class="detailField"><div class="detailLabel">Type</div><div class="detailValue">${isWin?'<span class="statusPill winloss-win">Lopende opdracht</span>':l.winloss==='Loss'?'<span class="statusPill winloss-loss">Loss</span>':'<span style="color:var(--pv-orange);">Lead in pipeline</span>'}</div></div>
+    <div class="detailField"><div class="detailLabel">Partner</div><div class="detailValue">${esc(l.partner)||'—'}</div></div>
+    <div class="detailField full"><div class="detailLabel">Omschrijving</div><div class="detailValue">${esc(l.omschrijving)||'—'}</div></div>
+    <div class="detailDivider"></div>
+    <div class="detailField"><div class="detailLabel">Status</div><div class="detailValue">${statusPill(l.status)}</div></div>
+    <div class="detailField"><div class="detailLabel">Honorarium</div><div class="detailValue" style="font-size:18px;font-weight:900;">${l.honorarium?fmtEuro(l.honorarium):'—'}</div></div>
+    <div class="detailField"><div class="detailLabel">Gewogen omzet</div><div class="detailValue">${l.verwacht?fmtEuro(l.verwacht):'—'}</div></div>
+    <div class="detailField"><div class="detailLabel">Winkans</div><div class="detailValue">${Math.round(l.winkans*100)}%</div></div>
+    <div class="detailDivider"></div>
+    <div class="detailField"><div class="detailLabel">Startdatum</div><div class="detailValue">${l.startdatum?fmtDateNL(l.startdatum):'—'}</div></div>
+    <div class="detailField"><div class="detailLabel">Einddatum</div><div class="detailValue">${l.einddatum?fmtDateNL(l.einddatum):'—'}</div></div>
+    <div class="detailField"><div class="detailLabel">Laatste contact</div><div class="detailValue">${l.laatsteContact?fmtDateNL(l.laatsteContact):'—'}</div></div>
+    <div class="detailField"><div class="detailLabel">Eerstvolgende contact</div><div class="detailValue" style="${getContactClass(l.volgendeContact)}">${l.volgendeContact?fmtDateNL(l.volgendeContact):'—'}</div></div>
+    ${l.klantType?`<div class="detailField"><div class="detailLabel">Klanttype</div><div class="detailValue">${esc(l.klantType)}</div></div>`:''}
+    ${l.opdrachtType?`<div class="detailField"><div class="detailLabel">Opdrachttype</div><div class="detailValue">${esc(l.opdrachtType)}</div></div>`:''}
+    ${l.opmerking?`<div class="detailDivider"></div><div class="detailField full"><div class="detailLabel">Opmerking / follow-up</div><div class="detailValue" style="color:var(--text-soft);font-size:13px;line-height:1.5;">${esc(l.opmerking)}</div></div>`:''}
+  `;
+
+  document.getElementById('detailEditBtn').onclick=()=>{closeDetail();openEditModal(idx);};
+  const lossBtn=document.getElementById('detailLossBtn');
+  if(l.winloss==='Loss'){
+    lossBtn.style.display='inline-flex';lossBtn.textContent='↩ Terugzetten als lead';
+    lossBtn.className='primary';lossBtn.onclick=()=>{restoreLead(idx);};
+  } else if(l.winloss!=='Win'){
+    lossBtn.style.display='inline-flex';lossBtn.textContent='✗ Markeer als Loss';
+    lossBtn.className='danger';lossBtn.onclick=()=>{markAsLoss(idx);};
+  } else {
+    lossBtn.style.display='none';
+  }
+  document.getElementById('detailOverlay').classList.add('active');
+}
+function closeDetail(){document.getElementById('detailOverlay').classList.remove('active');}
+
+/* ── Add/Edit modal ── */
+function openAddModal(){
+  editIndex=-1;document.getElementById('modalTitle').textContent='Nieuwe lead toevoegen';
+  document.getElementById('btnDeleteLead').style.display='none';clearForm();
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function openEditModal(idx){
+  editIndex=idx;const l=leads[idx];
+  document.getElementById('modalTitle').textContent='Bewerken — '+l.klant;
+  document.getElementById('btnDeleteLead').style.display='inline-flex';
+  document.getElementById('fKlant').value=l.klant;
+  document.getElementById('fOmschrijving').value=l.omschrijving;
+  const fp=document.getElementById('fPartner');ensureOpt(fp,l.partner);fp.value=l.partner;
+  document.getElementById('fStatus').value=l.status;
+  document.getElementById('fWinLoss').value=l.winloss||'';
+  document.getElementById('fStart').value=l.startdatum;
+  document.getElementById('fEind').value=l.einddatum;
+  document.getElementById('fHonorarium').value=l.honorarium||'';
+  document.getElementById('fKlantType').value=l.klantType||'';
+  document.getElementById('fLaatsteContact').value=l.laatsteContact||'';
+  document.getElementById('fVolgendeContact').value=l.volgendeContact||'';
+  document.getElementById('fOpmerking').value=l.opmerking;
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function ensureOpt(sel,val){if(!val)return;for(let o of sel.options)if(o.value===val)return;
+  const opt=document.createElement('option');opt.value=val;opt.textContent=val;sel.appendChild(opt);}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('active');}
+function clearForm(){['fKlant','fOmschrijving','fStart','fEind','fHonorarium','fOpmerking','fLaatsteContact','fVolgendeContact'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fStatus').value='1 - Geïdentificeerd';document.getElementById('fWinLoss').value='';document.getElementById('fKlantType').value='';}
+
+function saveLead(){
+  const klant=document.getElementById('fKlant').value.trim();if(!klant){toast('⚠️ Vul een klantnaam in');return;}
+  const status=document.getElementById('fStatus').value;const wl=document.getElementById('fWinLoss').value;
+  const hon=parseFloat(document.getElementById('fHonorarium').value)||0;
+  const winkans=wl==='Win'?1:(STATUS_WINKANS[status]||0);const verwacht=wl==='Win'?hon:hon*winkans;
+  const lead={klant,klantType:document.getElementById('fKlantType').value,
+    opdrachtType:editIndex>=0?leads[editIndex].opdrachtType:'',omschrijving:document.getElementById('fOmschrijving').value,
+    partner:document.getElementById('fPartner').value,status,
+    laatsteContact:document.getElementById('fLaatsteContact').value,volgendeContact:document.getElementById('fVolgendeContact').value,
+    opmerking:document.getElementById('fOpmerking').value,startdatum:document.getElementById('fStart').value,
+    einddatum:document.getElementById('fEind').value,honorarium:hon,winkans,winloss:wl,verwacht};
+  if(editIndex>=0){leads[editIndex]=lead;toast('✅ Bijgewerkt');}else{leads.push(lead);toast('✅ Toegevoegd');}
+  saveAndSync();closeModal();refreshAll();
+}
+
+function deleteLead(){
+  if(editIndex<0)return;if(!confirm('Weet je zeker dat je "'+leads[editIndex].klant+'" wilt verwijderen?'))return;
+  leads.splice(editIndex,1);saveAndSync();closeModal();refreshAll();toast('🗑 Verwijderd');
+}
+
+function markAsLoss(idx){
+  const l=leads[idx];
+  if(!confirm('Weet je zeker dat je "'+l.klant+(l.omschrijving?' — '+l.omschrijving:'')+'" als Loss wilt markeren?'))return;
+  leads[idx].winloss='Loss';leads[idx].winkans=0;leads[idx].verwacht=0;
+  saveAndSync();closeDetail();refreshAll();toast('✗ '+l.klant+' gemarkeerd als Loss');
+}
+
+function restoreLead(idx){
+  const l=leads[idx];
+  const winkans=STATUS_WINKANS[l.status]||0;
+  leads[idx].winloss='';leads[idx].winkans=winkans;leads[idx].verwacht=l.honorarium*winkans;
+  saveAndSync();closeDetail();refreshAll();toast('↩ '+l.klant+' teruggezet als lead');
+}
+
+function renderLosses(){
+  const losses=leads.filter(l=>l.winloss==='Loss');
+  const card=document.getElementById('lossCard');
+  if(!losses.length){card.style.display='none';return;}
+  card.style.display='block';
+  document.getElementById('lossNote').textContent=losses.length+' verloren lead'+(losses.length!==1?'s':'');
+  const body=document.getElementById('lossBody');
+  body.innerHTML=losses.map(l=>{
+    const idx=leads.indexOf(l);
+    return`<tr>
+      <td style="font-weight:700;opacity:.7;">${esc(l.klant)}</td>
+      <td style="color:var(--text-soft);opacity:.7;">${esc(l.omschrijving)||'—'}</td>
+      <td style="opacity:.7;">${esc(l.partner)||'—'}</td>
+      <td><span class="statusPill winloss-loss">Loss</span></td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;opacity:.7;">${l.honorarium?fmtEuro(l.honorarium):'—'}</td>
+      <td style="font-size:12px;color:var(--text-soft);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.opmerking)||'—'}</td>
+      <td><button style="padding:5px 10px;font-size:11px;" onclick="restoreLead(${idx})">↩ Herstel</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2800);}
+
+/* ── Init ── */
+if(checkForToken()){
+  onLoginSuccess();
+} else {
+  // Not logged in, show login screen
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+</script>
+</body>
+</html>
