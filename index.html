@@ -174,6 +174,16 @@
     .modalFilterToggle.active{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25);color:#fff;}
     .modalFilterToggle:not(.active){opacity:.45;}
     .modalFilterDot{width:10px;height:10px;border-radius:3px;}
+    .partnerPill{cursor:pointer;padding:6px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.10);font-size:12px;font-weight:700;color:var(--text-soft);transition:all .2s;user-select:none;white-space:nowrap;}
+    .partnerPill:hover{background:rgba(255,255,255,.06);}
+    .partnerPill.active{background:rgba(127,202,178,.15);border-color:rgba(127,202,178,.35);color:var(--pv-mint);}
+    .alertItem.expiring{border-color:rgba(179,157,219,.35);background:rgba(179,157,219,.08);}
+    .alertDot.expiring{background:var(--pv-purple);}
+    .alertBadge.expiring{background:rgba(179,157,219,.2);color:var(--pv-purple);}
+    .alertItem.upcominglead{border-color:rgba(107,174,214,.3);background:rgba(107,174,214,.06);}
+    .alertDot.upcominglead{background:var(--pv-blue);}
+    .alertBadge.upcominglead{background:rgba(107,174,214,.2);color:var(--pv-blue);}
+    .alertPartner{font-size:10px;font-weight:700;color:var(--text-soft);opacity:.7;letter-spacing:.03em;}
     ::-webkit-scrollbar{width:6px;height:6px;}
     ::-webkit-scrollbar-track{background:transparent;}
     ::-webkit-scrollbar-thumb{background:rgba(127,202,178,.25);border-radius:999px;}
@@ -219,10 +229,28 @@
       <div class="kpiBox" onclick="openKpiModal('potentieel')"><div class="kpiLabel">Potenti&#235;le omzet</div><div class="kpiValue" id="kpiPotential">&#8364; 0</div><div class="kpiSub" id="kpiPotentialSub">—</div></div>
     </div>
 
-    <div class="card alertSection" id="alertCard" style="display:none;">
-      <div class="topline" style="background:linear-gradient(90deg,rgba(217,107,107,.8),rgba(231,182,92,.8),rgba(107,174,214,.6));"></div>
-      <div class="sectionTitle"><h2>&#9889; Opvolging contactmomenten</h2><span class="note" id="alertNote">—</span></div>
-      <div class="alertList" id="alertList"></div>
+    <div class="card alertSection" id="alertCard">
+      <div class="topline" style="background:linear-gradient(90deg,rgba(217,107,107,.8),rgba(231,182,92,.8),rgba(107,174,214,.6),rgba(179,157,219,.6));"></div>
+      <div class="sectionTitle"><h2>&#9889; Actiepaneel</h2><span class="note" id="alertNote">—</span></div>
+      <div class="filterRow" id="partnerFilterRow" style="margin-bottom:12px;gap:6px;">
+        <label style="margin-right:4px;">Partner:</label>
+      </div>
+      <!-- Contact opvolging -->
+      <div id="alertContactSection" style="display:none;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pv-red);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--pv-red);display:inline-block;"></span> Contactmomenten</div>
+        <div class="alertList" id="alertList"></div>
+      </div>
+      <!-- Aflopende opdrachten -->
+      <div id="alertExpiringSection" style="display:none;margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pv-purple);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--pv-purple);display:inline-block;"></span> Aflopende opdrachten</div>
+        <div class="alertList" id="expiringList"></div>
+      </div>
+      <!-- Naderende leads -->
+      <div id="alertUpcomingLeadsSection" style="display:none;margin-bottom:4px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pv-blue);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--pv-blue);display:inline-block;"></span> Leads met naderende startdatum</div>
+        <div class="alertList" id="upcomingLeadsList"></div>
+      </div>
+      <div id="alertEmpty" class="noAlerts" style="display:none;">Geen acties op dit moment.</div>
     </div>
 
     <div class="chartsGridFull"><div class="card">
@@ -279,7 +307,7 @@
     <h3 id="modalTitle">Nieuwe lead toevoegen</h3>
     <div class="formGrid">
       <div class="formGroup"><label>Klant</label><input type="text" id="fKlant" /></div>
-      <div class="formGroup"><label>Partner</label><select id="fPartner"></select></div>
+      <div class="formGroup"><label>Partner</label><div style="display:flex;gap:6px;"><select id="fPartner" style="flex:1;"></select><button type="button" onclick="addNewPartner()" style="padding:8px 12px;font-size:12px;white-space:nowrap;" class="primary" title="Nieuwe partner toevoegen">+</button></div></div>
       <div class="formGroup full"><label>Omschrijving opdracht</label><input type="text" id="fOmschrijving" /></div>
       <div class="formGroup"><label>Status</label><select id="fStatus"><option value="1 - Ge&#239;dentificeerd">1 - Ge&#239;dentificeerd</option><option value="2 - Besproken">2 - Besproken</option><option value="3 - Offerte uitgebracht in concurrentie">3 - Offerte in concurrentie</option><option value="4 - Offerte uitgebracht zonder concurrentie">4 - Offerte zonder concurrentie</option></select></div>
       <div class="formGroup"><label>Win / Loss</label><select id="fWinLoss"><option value="">Open</option><option value="Win">Win</option><option value="Loss">Loss</option></select></div>
@@ -404,7 +432,63 @@ function refreshAll(){const has=leads.length>0;document.getElementById('emptySta
 
 function renderKPIs(){const wins=leads.filter(l=>l.winloss==='Win');const pipeline=leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss');const confirmedRev=wins.reduce((s,l)=>s+l.honorarium,0);const pipelineHon=pipeline.reduce((s,l)=>s+l.honorarium,0);const weightedRev=pipeline.reduce((s,l)=>s+l.verwacht,0);document.getElementById('kpiWins').textContent=wins.length;document.getElementById('kpiWinsSub').textContent=fmtEuro(confirmedRev)+' bevestigde omzet';document.getElementById('kpiLeads').textContent=pipeline.length;document.getElementById('kpiLeadsSub').textContent='verdeeld over '+[...new Set(pipeline.map(l=>l.partner).filter(Boolean))].length+' partners';document.getElementById('kpiConfirmed').textContent=fmtEuro(confirmedRev);document.getElementById('kpiConfirmedSub').textContent=wins.length+' gewonnen opdrachten';document.getElementById('kpiWeighted').textContent=fmtEuro(confirmedRev+weightedRev);document.getElementById('kpiWeightedSub').textContent='bevestigd + pipeline gewogen naar winkans';document.getElementById('kpiPotential').textContent=fmtEuro(confirmedRev+pipelineHon);document.getElementById('kpiPotentialSub').textContent='als alles gewonnen wordt';}
 
-function renderAlerts(){const today=new Date();today.setHours(0,0,0,0);const alerts=[];leads.forEach((l,idx)=>{if(l.winloss==='Win'||l.winloss==='Loss')return;if(!l.volgendeContact)return;const d=new Date(l.volgendeContact);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);let type,label;if(diff<0){type='overdue';label=Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' verlopen';}else if(diff===0){type='today';label='Vandaag';}else if(diff<=7){type='upcoming';label='Over '+diff+' dag'+(diff!==1?'en':'');}else return;alerts.push({idx,lead:l,type,label,diff,date:l.volgendeContact});});alerts.sort((a,b)=>a.diff-b.diff);const card=document.getElementById('alertCard');const list=document.getElementById('alertList');const note=document.getElementById('alertNote');if(alerts.length===0){card.style.display='none';return;}card.style.display='block';const overdue=alerts.filter(a=>a.type==='overdue').length;const todayCount=alerts.filter(a=>a.type==='today').length;const upcoming=alerts.filter(a=>a.type==='upcoming').length;const parts=[];if(overdue)parts.push(overdue+' verlopen');if(todayCount)parts.push(todayCount+' vandaag');if(upcoming)parts.push(upcoming+' komende week');note.textContent=parts.join(' · ');list.innerHTML=alerts.map(a=>`<div class="alertItem ${a.type}" onclick="openDetail(${a.idx})"><div class="alertDot ${a.type}"></div><div class="alertName">${esc(a.lead.klant)}${a.lead.omschrijving?' — '+esc(a.lead.omschrijving):''}</div><div class="alertMeta">${fmtDateNL(a.date)}</div><span class="alertBadge ${a.type}">${a.label}</span></div>`).join('');}
+let actionPartnerFilter='';
+
+function renderAlerts(){
+  const today=new Date();today.setHours(0,0,0,0);
+  
+  // Build partner filter pills
+  const allPartners=[...new Set(leads.map(l=>l.partner).filter(Boolean))].sort();
+  const pfRow=document.getElementById('partnerFilterRow');
+  pfRow.innerHTML='<label style="margin-right:4px;">Partner:</label><span class="partnerPill'+(actionPartnerFilter===''?' active':'')+'" onclick="setActionPartner(\'\')">Iedereen</span>';
+  allPartners.forEach(p=>{pfRow.innerHTML+=`<span class="partnerPill${actionPartnerFilter===p?' active':''}" onclick="setActionPartner('${esc(p)}')">${esc(p)}</span>`;});
+
+  // 1. Contact alerts (verlopen/vandaag/komende week)
+  const contactAlerts=[];
+  leads.forEach((l,idx)=>{if(l.winloss==='Win'||l.winloss==='Loss')return;if(!l.volgendeContact)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.volgendeContact);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);let type,label;if(diff<0){type='overdue';label=Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' verlopen';}else if(diff===0){type='today';label='Vandaag';}else if(diff<=7){type='upcoming';label='Over '+diff+' dag'+(diff!==1?'en':'');}else return;contactAlerts.push({idx,lead:l,type,label,diff,date:l.volgendeContact});});
+  contactAlerts.sort((a,b)=>a.diff-b.diff);
+
+  // 2. Expiring contracts (Win with einddatum within 45 days)
+  const expiringAlerts=[];
+  leads.forEach((l,idx)=>{if(l.winloss!=='Win')return;if(!l.einddatum)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.einddatum);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);if(diff<0&&diff>=-14){expiringAlerts.push({idx,lead:l,type:'overdue',label:Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' verlopen',diff,date:l.einddatum});}else if(diff>=0&&diff<=45){let label;if(diff===0)label='Vandaag';else label='Over '+diff+' dag'+(diff!==1?'en':'');expiringAlerts.push({idx,lead:l,type:diff<=7?'today':diff<=21?'upcoming':'upcoming',label,diff,date:l.einddatum});}});
+  expiringAlerts.sort((a,b)=>a.diff-b.diff);
+
+  // 3. Upcoming leads (pipeline with startdatum within 30 days)
+  const upcomingLeads=[];
+  leads.forEach((l,idx)=>{if(l.winloss==='Win'||l.winloss==='Loss')return;if(!l.startdatum)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.startdatum);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);if(diff>=-7&&diff<=30){let label;if(diff<0)label=Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' geleden';else if(diff===0)label='Vandaag';else label='Over '+diff+' dag'+(diff!==1?'en':'');upcomingLeads.push({idx,lead:l,type:diff<=0?'today':diff<=7?'upcoming':'upcoming',label,diff,date:l.startdatum});}});
+  upcomingLeads.sort((a,b)=>a.diff-b.diff);
+
+  // Update note
+  const totalActions=contactAlerts.length+expiringAlerts.length+upcomingLeads.length;
+  const note=document.getElementById('alertNote');
+  const parts=[];
+  if(contactAlerts.length)parts.push(contactAlerts.length+' contact');
+  if(expiringAlerts.length)parts.push(expiringAlerts.length+' aflopend');
+  if(upcomingLeads.length)parts.push(upcomingLeads.length+' naderend');
+  note.textContent=parts.length?parts.join(' · ')+(actionPartnerFilter?' — '+actionPartnerFilter:''):'Geen acties';
+
+  // Render contact alerts
+  const contactSection=document.getElementById('alertContactSection');
+  const alertList=document.getElementById('alertList');
+  if(contactAlerts.length){contactSection.style.display='block';alertList.innerHTML=contactAlerts.map(a=>`<div class="alertItem ${a.type}" onclick="openDetail(${a.idx})"><div class="alertDot ${a.type}"></div><div class="alertName">${esc(a.lead.klant)}${a.lead.omschrijving?' — '+esc(a.lead.omschrijving):''}<div class="alertPartner">${esc(a.lead.partner||'')}</div></div><div class="alertMeta">${fmtDateNL(a.date)}</div><span class="alertBadge ${a.type}">${a.label}</span></div>`).join('');}else{contactSection.style.display='none';}
+
+  // Render expiring contracts
+  const expiringSection=document.getElementById('alertExpiringSection');
+  const expiringList=document.getElementById('expiringList');
+  if(expiringAlerts.length){expiringSection.style.display='block';expiringList.innerHTML=expiringAlerts.map(a=>`<div class="alertItem expiring" onclick="openDetail(${a.idx})"><div class="alertDot expiring"></div><div class="alertName">${esc(a.lead.klant)}${a.lead.omschrijving?' — '+esc(a.lead.omschrijving):''}<div class="alertPartner">${esc(a.lead.partner||'')} · ${fmtEuro(a.lead.honorarium)}</div></div><div class="alertMeta">Einddatum: ${fmtDateNL(a.date)}</div><span class="alertBadge expiring">${a.label}</span></div>`).join('');}else{expiringSection.style.display='none';}
+
+  // Render upcoming leads
+  const upcomingSection=document.getElementById('alertUpcomingLeadsSection');
+  const upcomingList=document.getElementById('upcomingLeadsList');
+  if(upcomingLeads.length){upcomingSection.style.display='block';upcomingList.innerHTML=upcomingLeads.map(a=>`<div class="alertItem upcominglead" onclick="openDetail(${a.idx})"><div class="alertDot upcominglead"></div><div class="alertName">${esc(a.lead.klant)}${a.lead.omschrijving?' — '+esc(a.lead.omschrijving):''}<div class="alertPartner">${esc(a.lead.partner||'')} · ${statusPill(a.lead.status)} · ${fmtEuro(a.lead.honorarium)}</div></div><div class="alertMeta">Startdatum: ${fmtDateNL(a.date)}</div><span class="alertBadge upcominglead">${a.label}</span></div>`).join('');}else{upcomingSection.style.display='none';}
+
+  // Show empty state
+  document.getElementById('alertEmpty').style.display=totalActions===0?'block':'none';
+}
+
+function setActionPartner(p){actionPartnerFilter=p;renderAlerts();}
+
+function addNewPartner(){const name=prompt('Naam van de nieuwe partner:');if(!name||!name.trim())return;const trimmed=name.trim();if(!PARTNERS_DEFAULT.includes(trimmed)){PARTNERS_DEFAULT.push(trimmed);PARTNERS_DEFAULT.sort();}const sel=document.getElementById('fPartner');sel.innerHTML='<option value="">— Kies —</option>';PARTNERS_DEFAULT.forEach(p=>{sel.innerHTML+=`<option value="${p}">${p}</option>`;});sel.value=trimmed;toast('✅ Partner "'+trimmed+'" toegevoegd');}
 
 /* Timeline */
 function getMonthlyRevenue(){const now=new Date();const currentY=now.getFullYear();const currentM=now.getMonth();const months=[];for(let i=0;i<12;i++){let m=currentM+i;let y=currentY;if(m>=12){m-=12;y++;}months.push({month:m,year:y,confirmed:0,pipeline:0,potential:0,leads:[]});}const ym=(y,m)=>y*12+m;const firstYM=ym(months[0].year,months[0].month);const lastYM=ym(months[11].year,months[11].month);leads.forEach(l=>{if(!l.honorarium||l.honorarium<=0||l.winloss==='Loss')return;const isWin=l.winloss==='Win';const start=l.startdatum?new Date(l.startdatum):null;const end=l.einddatum?new Date(l.einddatum):null;if(start&&end&&end>=start){const startY=start.getFullYear(),startM=start.getMonth();const endY=end.getFullYear(),endM=end.getMonth();const totalMonths=(endY-startY)*12+(endM-startM)+1;const monthlyHon=l.honorarium/totalMonths;const monthlyVerwacht=l.verwacht/totalMonths;for(let i=0;i<totalMonths;i++){const mIdx=startM+i;const my=startY+Math.floor(mIdx/12);const mm=mIdx%12;const thisYM=ym(my,mm);if(thisYM<firstYM||thisYM>lastYM)continue;const slot=months.find(s=>s.year===my&&s.month===mm);if(slot){if(isWin){slot.confirmed+=monthlyHon;slot.leads.push({name:l.klant,omschrijving:l.omschrijving,amount:monthlyHon,amountPotential:monthlyHon,isWin,idx:leads.indexOf(l)});}else{slot.pipeline+=monthlyVerwacht;slot.potential+=monthlyHon;slot.leads.push({name:l.klant,omschrijving:l.omschrijving,amount:monthlyVerwacht,amountPotential:monthlyHon,isWin,idx:leads.indexOf(l)});}}}}else if(start){const sYM=ym(start.getFullYear(),start.getMonth());if(sYM>=firstYM&&sYM<=lastYM){const slot=months.find(s=>s.year===start.getFullYear()&&s.month===start.getMonth());if(slot){if(isWin){slot.confirmed+=l.honorarium;slot.leads.push({name:l.klant,omschrijving:l.omschrijving,amount:l.honorarium,amountPotential:l.honorarium,isWin,idx:leads.indexOf(l)});}else{slot.pipeline+=l.verwacht;slot.potential+=l.honorarium;slot.leads.push({name:l.klant,omschrijving:l.omschrijving,amount:l.verwacht,amountPotential:l.honorarium,isWin,idx:leads.indexOf(l)});}}}}else{if(isWin){months[0].confirmed+=l.honorarium;months[0].leads.push({name:l.klant,omschrijving:l.omschrijving,amount:l.honorarium,amountPotential:l.honorarium,isWin:true,idx:leads.indexOf(l)});}else if(l.verwacht>0){const spread=Math.min(3,months.length);const pm=l.verwacht/spread;const pmPot=l.honorarium/spread;for(let i=0;i<spread;i++){months[i].pipeline+=pm;months[i].potential+=pmPot;months[i].leads.push({name:l.klant,omschrijving:l.omschrijving,amount:pm,amountPotential:pmPot,isWin:false,idx:leads.indexOf(l)});}}}});return months;}
