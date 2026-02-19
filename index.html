@@ -247,7 +247,7 @@
       </div>
       <!-- Naderende leads -->
       <div id="alertUpcomingLeadsSection" style="display:none;margin-bottom:4px;">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pv-blue);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--pv-blue);display:inline-block;"></span> Leads met naderende startdatum</div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--pv-blue);margin-bottom:8px;display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--pv-blue);display:inline-block;"></span> Leads — startdatum bereikt of naderend</div>
         <div class="alertList" id="upcomingLeadsList"></div>
       </div>
       <div id="alertEmpty" class="noAlerts" style="display:none;">Geen acties op dit moment.</div>
@@ -448,14 +448,14 @@ function renderAlerts(){
   leads.forEach((l,idx)=>{if(l.winloss==='Win'||l.winloss==='Loss')return;if(!l.volgendeContact)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.volgendeContact);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);let type,label;if(diff<0){type='overdue';label=Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' verlopen';}else if(diff===0){type='today';label='Vandaag';}else if(diff<=7){type='upcoming';label='Over '+diff+' dag'+(diff!==1?'en':'');}else return;contactAlerts.push({idx,lead:l,type,label,diff,date:l.volgendeContact});});
   contactAlerts.sort((a,b)=>a.diff-b.diff);
 
-  // 2. Expiring contracts (Win with einddatum within 45 days)
+  // 2. Expiring contracts (Win with einddatum within 30 days)
   const expiringAlerts=[];
-  leads.forEach((l,idx)=>{if(l.winloss!=='Win')return;if(!l.einddatum)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.einddatum);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);if(diff<0&&diff>=-14){expiringAlerts.push({idx,lead:l,type:'overdue',label:Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' verlopen',diff,date:l.einddatum});}else if(diff>=0&&diff<=45){let label;if(diff===0)label='Vandaag';else label='Over '+diff+' dag'+(diff!==1?'en':'');expiringAlerts.push({idx,lead:l,type:diff<=7?'today':diff<=21?'upcoming':'upcoming',label,diff,date:l.einddatum});}});
+  leads.forEach((l,idx)=>{if(l.winloss!=='Win')return;if(!l.einddatum)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.einddatum);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);if(diff<0){expiringAlerts.push({idx,lead:l,type:'overdue',label:Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' verlopen',diff,date:l.einddatum});}else if(diff<=30){let label;if(diff===0)label='Vandaag';else label='Over '+diff+' dag'+(diff!==1?'en':'');expiringAlerts.push({idx,lead:l,type:diff<=7?'today':'upcoming',label,diff,date:l.einddatum});}});
   expiringAlerts.sort((a,b)=>a.diff-b.diff);
 
-  // 3. Upcoming leads (pipeline with startdatum within 30 days)
+  // 3. Leads with past or upcoming startdatum (all past + 30 days ahead)
   const upcomingLeads=[];
-  leads.forEach((l,idx)=>{if(l.winloss==='Win'||l.winloss==='Loss')return;if(!l.startdatum)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.startdatum);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);if(diff>=-7&&diff<=30){let label;if(diff<0)label=Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' geleden';else if(diff===0)label='Vandaag';else label='Over '+diff+' dag'+(diff!==1?'en':'');upcomingLeads.push({idx,lead:l,type:diff<=0?'today':diff<=7?'upcoming':'upcoming',label,diff,date:l.startdatum});}});
+  leads.forEach((l,idx)=>{if(l.winloss==='Win'||l.winloss==='Loss')return;if(!l.startdatum)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.startdatum);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);if(diff<0){upcomingLeads.push({idx,lead:l,type:'overdue',label:Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' geleden',diff,date:l.startdatum});}else if(diff<=30){let label;if(diff===0)label='Vandaag';else label='Over '+diff+' dag'+(diff!==1?'en':'');upcomingLeads.push({idx,lead:l,type:diff<=7?'today':'upcoming',label,diff,date:l.startdatum});}});
   upcomingLeads.sort((a,b)=>a.diff-b.diff);
 
   // Update note
