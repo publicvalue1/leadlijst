@@ -487,9 +487,19 @@ function renderAlerts(){
   leads.forEach((l,idx)=>{if(l.winloss==='Win'||l.winloss==='Loss'||l.winloss==='Afgerond')return;if(!l.startdatum)return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const d=new Date(l.startdatum);d.setHours(0,0,0,0);const diff=Math.round((d-today)/864e5);if(diff<0){upcomingLeads.push({idx,lead:l,type:'overdue',label:Math.abs(diff)+' dag'+(Math.abs(diff)!==1?'en':'')+' geleden',diff,date:l.startdatum});}else if(diff<=30){let label;if(diff===0)label='Vandaag';else label='Over '+diff+' dag'+(diff!==1?'en':'');upcomingLeads.push({idx,lead:l,type:diff<=7?'today':'upcoming',label,diff,date:l.startdatum});}});
   upcomingLeads.sort((a,b)=>a.diff-b.diff);
 
-  // 4. Incomplete data (missing dates or tariff on active items)
+  // 4. Incomplete data: only when there's an imbalance or offerte stage
   const incompleteAlerts=[];
-  leads.forEach((l,idx)=>{if(l.winloss==='Loss'||l.winloss==='Afgerond')return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const issues=[];const isWin=l.winloss==='Win';if(!l.startdatum)issues.push('geen startdatum');if(!l.einddatum)issues.push('geen einddatum');if(!l.honorarium||l.honorarium<=0)issues.push('geen tarief');if(issues.length>0){incompleteAlerts.push({idx,lead:l,issues,isWin});}});
+  leads.forEach((l,idx)=>{if(l.winloss==='Loss'||l.winloss==='Afgerond')return;if(actionPartnerFilter&&l.partner!==actionPartnerFilter)return;const issues=[];const isWin=l.winloss==='Win';const hasDates=l.startdatum||l.einddatum;const hasAmount=l.honorarium&&l.honorarium>0;const isOfferte=l.status&&(l.status.startsWith('3 -')||l.status.startsWith('4 -'));
+  // Case 1: has dates but no amount
+  if(hasDates&&!hasAmount)issues.push('geen tarief');
+  // Case 2: has amount but no dates
+  if(hasAmount&&!hasDates){if(!l.startdatum)issues.push('geen startdatum');if(!l.einddatum)issues.push('geen einddatum');}
+  // Case 3: offerte uitgebracht but missing key info
+  if(isOfferte&&!hasAmount)issues.push('geen tarief');
+  if(isOfferte&&!hasDates){if(!l.startdatum)issues.push('geen startdatum');if(!l.einddatum)issues.push('geen einddatum');}
+  // Deduplicate
+  const unique=[...new Set(issues)];
+  if(unique.length>0){incompleteAlerts.push({idx,lead:l,issues:unique,isWin});}});
 
   // Update note
   const totalActions=contactAlerts.length+expiringAlerts.length+upcomingLeads.length+incompleteAlerts.length;
@@ -533,7 +543,7 @@ const INFO_TEXTS={
   contact:{title:'Contactmomenten',text:'Leads waarvan het eerstvolgende contactmoment verlopen is, vandaag is, of binnen 7 dagen valt. Klik op een item om de details te bekijken en bij te werken.'},
   expiring:{title:'Aflopende opdrachten',text:'Lopende opdrachten (Win) waarvan de einddatum binnen 30 dagen valt of al verlopen is. Dit zijn opdrachten waarvoor mogelijk verlenging of een vervolgopdracht nodig is.'},
   upcoming:{title:'Leads — startdatum bereikt of naderend',text:'Leads in de pipeline waarvan de startdatum al verstreken is of binnen 30 dagen valt. Leads met een verlopen startdatum vereisen actie: win markeren, startdatum bijwerken, of als loss afsluiten.'},
-  incomplete:{title:'Onvolledige gegevens',text:'Opdrachten of leads waarbij essentiële informatie ontbreekt. Zonder datum kan een item niet in de omzetprognose verschijnen. Zonder tarief is de omzet onbekend. Vul bij benadering in als het exacte bedrag of de exacte datum nog niet bekend is.'}
+  incomplete:{title:'Onvolledige gegevens',text:'Items waarbij gegevens niet kloppen: een tarief zonder datum(s), datum(s) zonder tarief, of een uitgebrachte offerte (status 3/4) waar nog essentiële info mist. Zonder beide kan een item niet in de omzetprognose verschijnen. Vul bij benadering in als het exacte bedrag of de exacte datum nog niet bekend is.'}
 };
 function showInfo(type){const info=INFO_TEXTS[type];if(!info)return;const overlay=document.createElement('div');overlay.className='infoPopupOverlay';const popup=document.createElement('div');popup.className='infoPopup';popup.innerHTML=`<h4>${info.title}</h4><p>${info.text}</p><div style="text-align:right;margin-top:12px;"><button onclick="this.closest('.infoPopup').remove();document.querySelector('.infoPopupOverlay').remove();" class="primary" style="padding:8px 18px;">Begrepen</button></div>`;document.body.appendChild(overlay);document.body.appendChild(popup);overlay.onclick=()=>{popup.remove();overlay.remove();};}
 
