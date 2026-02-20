@@ -599,8 +599,108 @@ function renderWinsTable(){const partner=document.getElementById('filterPartnerW
 function renderLeadsTable(){const status=document.getElementById('filterStatusLeads').value;const partner=document.getElementById('filterPartnerLeads').value;const search=document.getElementById('searchLeads').value.toLowerCase();const pipeline=leads.filter(l=>{if(l.winloss==='Win'||l.winloss==='Loss'||l.winloss==='Afgerond')return false;if(status&&l.status!==status)return false;if(partner&&l.partner!==partner)return false;if(search&&!(l.klant.toLowerCase().includes(search)||l.omschrijving.toLowerCase().includes(search)))return false;return true;});document.getElementById('tableLeadsCount').textContent=pipeline.length+' leads · '+fmtEuro(pipeline.reduce((s,l)=>s+l.honorarium,0))+' potentieel';const head=document.getElementById('tableLeadsHead');head.innerHTML=TABLE_LEADS_COLS.map((c,i)=>{const s=sortLeadsCol===i;const arrow=s?(sortLeadsAsc?'▲':'▼'):'⇅';return`<th class="${s?'sorted':''}" onclick="sortLeadsCol=${i};sortLeadsAsc=${sortLeadsCol===i?!sortLeadsAsc:true};renderLeadsTable()">${c.label} <span class="sortArrow">${arrow}</span></th>`;}).join('');let sorted=[...pipeline];if(sortLeadsCol>=0){const key=TABLE_LEADS_COLS[sortLeadsCol].key;sorted.sort((a,b)=>{let va=a[key],vb=b[key];if(typeof va==='number'&&typeof vb==='number')return sortLeadsAsc?va-vb:vb-va;va=String(va||'').toLowerCase();vb=String(vb||'').toLowerCase();return sortLeadsAsc?va.localeCompare(vb):vb.localeCompare(va);});}document.getElementById('tableLeadsBody').innerHTML=sorted.map(l=>{const idx=leads.indexOf(l);const contactClass=getContactClass(l.volgendeContact);return`<tr onclick="openDetail(${idx})"><td style="font-weight:700;">${esc(l.klant)}</td><td>${esc(l.omschrijving)}</td><td>${esc(l.partner)}</td><td>${statusPill(l.status)}</td><td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;">${l.honorarium?fmtEuro(l.honorarium):'—'}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-soft);">${l.verwacht?fmtEuro(l.verwacht):'—'}</td><td style="font-size:12px;">${l.laatsteContact?fmtDateNL(l.laatsteContact):'—'}</td><td style="font-size:12px;${contactClass}">${l.volgendeContact?fmtDateNL(l.volgendeContact):'—'}</td><td style="font-size:12px;color:var(--text-soft);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(l.opmerking)}">${esc(l.opmerking)}</td></tr>`;}).join('');}
 
 /* KPI Detail Modal */
-function openKpiModal(type){let items=[],title='',totalVal=0,totalLabel='Omzet';if(type==='opdrachten'){items=leads.filter(l=>l.winloss==='Win');title='Lopende Opdrachten';totalVal=items.reduce((s,l)=>s+l.honorarium,0);document.getElementById('kpiModalTitle').textContent=title;document.getElementById('kmTotal').textContent=fmtEuro(totalVal);document.getElementById('kmTotalLabel').textContent='Omzet';document.getElementById('kmCount').textContent=items.length;document.getElementById('kpiModalHead').innerHTML='<th>Klant</th><th>Opdracht</th><th>Partner</th><th style="text-align:right;">Omzet</th><th>Periode</th>';document.getElementById('kpiModalBody').innerHTML=items.map(l=>{const idx=leads.indexOf(l);const periode=l.startdatum&&l.einddatum?fmtDateNL(l.startdatum)+' — '+fmtDateNL(l.einddatum):(l.startdatum?'Vanaf '+fmtDateNL(l.startdatum):'—');return`<tr onclick="closeKpiModal();openDetail(${idx})"><td style="font-weight:700;">${esc(l.klant)}</td><td style="color:var(--text-soft);">${esc(l.omschrijving||'')}</td><td>${esc(l.partner||'')}</td><td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${fmtEuro(l.honorarium)}</td><td style="font-size:12px;color:var(--text-soft);white-space:nowrap;">${periode}</td></tr>`;}).join('');document.getElementById('kpiModalOverlay').classList.add('active');return;}if(type==='leads'){items=leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss'&&l.winloss!=='Afgerond');title='Leads in Pipeline';totalVal=items.reduce((s,l)=>s+l.honorarium,0);totalLabel='Potentieel';}else if(type==='bevestigd'){items=leads.filter(l=>l.winloss==='Win');title='Bevestigde Omzet';totalVal=items.reduce((s,l)=>s+l.honorarium,0);}else if(type==='gewogen'){items=leads.filter(l=>l.winloss!=='Loss'&&l.winloss!=='Afgerond');title='Gewogen Omzet';totalVal=items.reduce((s,l)=>s+l.verwacht,0);totalLabel='Gewogen';}else if(type==='potentieel'){items=leads.filter(l=>l.winloss!=='Loss'&&l.winloss!=='Afgerond');title='Potentiële Omzet';totalVal=items.reduce((s,l)=>s+l.honorarium,0);totalLabel='Potentieel';}document.getElementById('kpiModalTitle').textContent=title;document.getElementById('kmTotal').textContent=fmtEuro(totalVal);document.getElementById('kmTotalLabel').textContent=totalLabel;document.getElementById('kmCount').textContent=items.length;document.getElementById('kpiModalHead').innerHTML='<th>Klant</th><th>Opdracht</th><th>Status</th><th style="text-align:right;">Potentieel</th><th style="text-align:right;">Gewogen</th>';document.getElementById('kpiModalBody').innerHTML=items.map(l=>{const idx=leads.indexOf(l);return`<tr onclick="closeKpiModal();openDetail(${idx})"><td style="font-weight:700;">${esc(l.klant)}</td><td style="color:var(--text-soft);">${esc(l.omschrijving||'')}</td><td>${l.winloss==='Win'?'<span class="statusPill winloss-win">Lopend</span>':statusPill(l.status)}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-soft);">${fmtEuro(l.honorarium)}</td><td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${fmtEuro(l.verwacht)}</td></tr>`;}).join('');document.getElementById('kpiModalOverlay').classList.add('active');}
-function closeKpiModal(){document.getElementById('kpiModalOverlay').classList.remove('active');}
+function openKpiModal(type){
+  const today=new Date();today.setHours(0,0,0,0);
+  function calcRemaining(l){const start=l.startdatum?new Date(l.startdatum):null;const end=l.einddatum?new Date(l.einddatum):null;if(start&&end&&end>=start){const totalDays=Math.max((end-start)/(864e5)+1,1);const effectiveStart=start<today?today:start;if(effectiveStart>end)return 0;const remainDays=(end-effectiveStart)/(864e5)+1;return l.honorarium*(remainDays/totalDays);}return l.honorarium;}
+
+  if(type==='opdrachten'){
+    const items=leads.filter(l=>l.winloss==='Win');
+    const totalRemaining=Math.round(items.reduce((s,l)=>s+calcRemaining(l),0));
+    const totalFull=items.reduce((s,l)=>s+l.honorarium,0);
+    document.getElementById('kpiModalTitle').textContent='Lopende Opdrachten';
+    document.getElementById('kmTotal').textContent=fmtEuro(totalRemaining);
+    document.getElementById('kmTotalLabel').textContent='Resterend';
+    document.getElementById('kmCount').textContent=items.length;
+    document.getElementById('kpiModalHead').innerHTML='<th>Klant</th><th>Opdracht</th><th>Partner</th><th style="text-align:right;">Totaal</th><th style="text-align:right;">Resterend</th><th>Periode</th>';
+    document.getElementById('kpiModalBody').innerHTML=items.sort((a,b)=>calcRemaining(b)-calcRemaining(a)).map(l=>{
+      const idx=leads.indexOf(l);const rem=Math.round(calcRemaining(l));
+      const periode=l.startdatum&&l.einddatum?fmtDateNL(l.startdatum)+' — '+fmtDateNL(l.einddatum):(l.startdatum?'Vanaf '+fmtDateNL(l.startdatum):'—');
+      return`<tr onclick="closeKpiModal();openDetail(${idx})"><td style="font-weight:700;">${esc(l.klant)}</td><td style="color:var(--text-soft);">${esc(l.omschrijving||'')}</td><td>${esc(l.partner||'')}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-soft);">${fmtEuro(l.honorarium)}</td><td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${fmtEuro(rem)}</td><td style="font-size:12px;color:var(--text-soft);white-space:nowrap;">${periode}</td></tr>`;
+    }).join('');
+    document.getElementById('kpiModalOverlay').classList.add('active');return;
+  }
+
+  // For leads/bevestigd/gewogen/potentieel - build with filters
+  let title='',totalLabel='Omzet';
+  let allItems=[],calcVal=l=>0;
+
+  if(type==='leads'){
+    title='Leads in Pipeline';totalLabel='Potentieel';
+    allItems=leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss'&&l.winloss!=='Afgerond');
+    calcVal=l=>l.honorarium;
+  }else if(type==='bevestigd'){
+    title='Bevestigde Omzet (resterend)';totalLabel='Resterend';
+    allItems=leads.filter(l=>l.winloss==='Win');
+    calcVal=l=>Math.round(calcRemaining(l));
+  }else if(type==='gewogen'){
+    title='Gewogen Omzet';totalLabel='Gewogen';
+    allItems=[...leads.filter(l=>l.winloss==='Win').map(l=>({...l,_type:'win',_val:Math.round(calcRemaining(l)),_pot:l.honorarium})),...leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss'&&l.winloss!=='Afgerond').map(l=>({...l,_type:'lead',_val:l.verwacht,_pot:l.honorarium}))];
+    calcVal=l=>l._val!==undefined?l._val:l.verwacht;
+  }else if(type==='potentieel'){
+    title='Potentiële Omzet';totalLabel='Potentieel';
+    allItems=[...leads.filter(l=>l.winloss==='Win').map(l=>({...l,_type:'win',_val:Math.round(calcRemaining(l)),_pot:l.honorarium})),...leads.filter(l=>l.winloss!=='Win'&&l.winloss!=='Loss'&&l.winloss!=='Afgerond').map(l=>({...l,_type:'lead',_val:l.honorarium,_pot:l.honorarium}))];
+    calcVal=l=>l._val!==undefined?l._val:l.honorarium;
+  }
+
+  // Build partner filter
+  const partners=[...new Set(allItems.map(l=>l.partner).filter(Boolean))].sort();
+  let filterPartner='';let filterHideZero=true;
+
+  function renderKpiModalContent(){
+    let filtered=allItems;
+    if(filterPartner)filtered=filtered.filter(l=>l.partner===filterPartner);
+    if(filterHideZero)filtered=filtered.filter(l=>calcVal(l)>0);
+    filtered.sort((a,b)=>calcVal(b)-calcVal(a));
+    const totalVal=filtered.reduce((s,l)=>s+calcVal(l),0);
+
+    document.getElementById('kpiModalTitle').textContent=title;
+    document.getElementById('kmTotal').textContent=fmtEuro(Math.round(totalVal));
+    document.getElementById('kmTotalLabel').textContent=totalLabel;
+    document.getElementById('kmCount').textContent=filtered.length;
+
+    // Determine columns based on type
+    let headHtml,isBevestigd=type==='bevestigd';
+    if(isBevestigd){
+      headHtml='<th>Klant</th><th>Opdracht</th><th>Partner</th><th style="text-align:right;">Totaal</th><th style="text-align:right;">Resterend</th><th>Periode</th>';
+    }else if(type==='leads'){
+      headHtml='<th>Klant</th><th>Opdracht</th><th>Partner</th><th>Status</th><th style="text-align:right;">Potentieel</th><th style="text-align:right;">Gewogen</th>';
+    }else{
+      headHtml='<th>Klant</th><th>Opdracht</th><th>Partner</th><th>Type</th><th style="text-align:right;">Waarde</th>';
+    }
+
+    // Filters row
+    let filtersHtml='<div class="modalFilterRow"><span class="modalFilterToggle'+(filterPartner===''?' active':'')+'" onclick="kpiFilterPartner(\'\')">Iedereen</span>';
+    partners.forEach(p=>{filtersHtml+=`<span class="modalFilterToggle${filterPartner===p?' active':''}" onclick="kpiFilterPartner('${esc(p)}')">${esc(p)}</span>`;});
+    filtersHtml+=`<span style="margin-left:auto;" class="modalFilterToggle${filterHideZero?' active':''}" onclick="kpiToggleZero()">Verberg € 0</span></div>`;
+
+    document.getElementById('kpiModalHead').innerHTML=headHtml;
+    // Insert filter row before table
+    let existingFilters=document.getElementById('kpiFilterRow');
+    if(!existingFilters){existingFilters=document.createElement('div');existingFilters.id='kpiFilterRow';document.getElementById('kpiModalHead').closest('table').parentNode.insertBefore(existingFilters,document.getElementById('kpiModalHead').closest('table'));}
+    existingFilters.innerHTML=filtersHtml;
+
+    document.getElementById('kpiModalBody').innerHTML=filtered.map(l=>{
+      const origIdx=leads.indexOf(l);const idx=origIdx>=0?origIdx:leads.findIndex(o=>o.klant===l.klant&&o.omschrijving===l.omschrijving);
+      if(isBevestigd){
+        const rem=Math.round(calcRemaining(l));
+        const periode=l.startdatum&&l.einddatum?fmtDateNL(l.startdatum)+' — '+fmtDateNL(l.einddatum):(l.startdatum?'Vanaf '+fmtDateNL(l.startdatum):'—');
+        return`<tr onclick="closeKpiModal();openDetail(${idx})"><td style="font-weight:700;">${esc(l.klant)}</td><td style="color:var(--text-soft);">${esc(l.omschrijving||'')}</td><td>${esc(l.partner||'')}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-soft);">${fmtEuro(l.honorarium)}</td><td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${fmtEuro(rem)}</td><td style="font-size:12px;color:var(--text-soft);white-space:nowrap;">${periode}</td></tr>`;
+      }else if(type==='leads'){
+        return`<tr onclick="closeKpiModal();openDetail(${idx})"><td style="font-weight:700;">${esc(l.klant)}</td><td style="color:var(--text-soft);">${esc(l.omschrijving||'')}</td><td>${esc(l.partner||'')}</td><td>${statusPill(l.status)}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-soft);">${fmtEuro(l.honorarium)}</td><td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${fmtEuro(l.verwacht)}</td></tr>`;
+      }else{
+        const typeLabel=l._type==='win'?'<span class="statusPill winloss-win">Lopend</span>':statusPill(l.status);
+        return`<tr onclick="closeKpiModal();openDetail(${idx})"><td style="font-weight:700;">${esc(l.klant)}</td><td style="color:var(--text-soft);">${esc(l.omschrijving||'')}</td><td>${esc(l.partner||'')}</td><td>${typeLabel}</td><td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${fmtEuro(calcVal(l))}</td></tr>`;
+      }
+    }).join('');
+  }
+
+  window.kpiFilterPartner=function(p){filterPartner=p;renderKpiModalContent();};
+  window.kpiToggleZero=function(){filterHideZero=!filterHideZero;renderKpiModalContent();};
+
+  renderKpiModalContent();
+  document.getElementById('kpiModalOverlay').classList.add('active');
+}
+function closeKpiModal(){document.getElementById('kpiModalOverlay').classList.remove('active');const fr=document.getElementById('kpiFilterRow');if(fr)fr.innerHTML='';}
 
 /* Lead detail modal */
 function openDetail(idx){const l=leads[idx];if(!l)return;document.getElementById('detailTitle').textContent=l.klant;const isWin=l.winloss==='Win';const grid=document.getElementById('detailGrid');grid.innerHTML=`<div class="detailField"><div class="detailLabel">Type</div><div class="detailValue">${isWin?'<span class="statusPill winloss-win">Lopende opdracht</span>':l.winloss==='Afgerond'?'<span class="statusPill winloss-afgerond">Afgerond</span>':l.winloss==='Loss'?'<span class="statusPill winloss-loss">Loss</span>':'<span style="color:var(--pv-orange);">Lead in pipeline</span>'}</div></div><div class="detailField"><div class="detailLabel">Partner</div><div class="detailValue">${esc(l.partner)||'—'}</div></div><div class="detailField full"><div class="detailLabel">Omschrijving</div><div class="detailValue">${esc(l.omschrijving)||'—'}</div></div><div class="detailDivider"></div><div class="detailField"><div class="detailLabel">Status</div><div class="detailValue">${statusPill(l.status)}</div></div><div class="detailField"><div class="detailLabel">Honorarium</div><div class="detailValue" style="font-size:18px;font-weight:900;">${l.honorarium?fmtEuro(l.honorarium):'—'}</div></div><div class="detailField"><div class="detailLabel">Gewogen omzet</div><div class="detailValue">${l.verwacht?fmtEuro(l.verwacht):'—'}</div></div><div class="detailField"><div class="detailLabel">Winkans</div><div class="detailValue">${Math.round(l.winkans*100)}%</div></div><div class="detailDivider"></div><div class="detailField"><div class="detailLabel">Startdatum</div><div class="detailValue">${l.startdatum?fmtDateNL(l.startdatum):'—'}</div></div><div class="detailField"><div class="detailLabel">Einddatum</div><div class="detailValue">${l.einddatum?fmtDateNL(l.einddatum):'—'}</div></div><div class="detailField"><div class="detailLabel">Laatste contact</div><div class="detailValue">${l.laatsteContact?fmtDateNL(l.laatsteContact):'—'}</div></div><div class="detailField"><div class="detailLabel">Eerstvolgende contact</div><div class="detailValue" style="${getContactClass(l.volgendeContact)}">${l.volgendeContact?fmtDateNL(l.volgendeContact):'—'}</div></div>${l.klantType?`<div class="detailField"><div class="detailLabel">Klanttype</div><div class="detailValue">${esc(l.klantType)}</div></div>`:''}${l.opdrachtType?`<div class="detailField"><div class="detailLabel">Opdrachttype</div><div class="detailValue">${esc(l.opdrachtType)}</div></div>`:''}${l.opmerking?`<div class="detailDivider"></div><div class="detailField full"><div class="detailLabel">Opmerking / follow-up</div><div class="detailValue" style="color:var(--text-soft);font-size:13px;line-height:1.5;">${esc(l.opmerking)}</div></div>`:''}`;document.getElementById('detailEditBtn').onclick=()=>{closeDetail();openEditModal(idx);};const lossBtn=document.getElementById('detailLossBtn');const winBtn=document.getElementById('detailWinBtn');winBtn.style.display='none';if(l.winloss==='Loss'){lossBtn.style.display='inline-flex';lossBtn.textContent='↩ Terugzetten als lead';lossBtn.className='primary';lossBtn.onclick=()=>{restoreLead(idx);};}else if(l.winloss==='Afgerond'){lossBtn.style.display='inline-flex';lossBtn.textContent='↩ Heropen als opdracht';lossBtn.className='primary';lossBtn.onclick=()=>{reopenAsWin(idx);closeDetail();};}else if(isWin){lossBtn.style.display='inline-flex';lossBtn.textContent='✓ Opdracht afronden';lossBtn.className='primary';lossBtn.onclick=()=>{markAsCompleted(idx);};}else{lossBtn.style.display='inline-flex';lossBtn.textContent='✗ Markeer als Loss';lossBtn.className='danger';lossBtn.onclick=()=>{markAsLoss(idx);};winBtn.style.display='inline-flex';winBtn.onclick=()=>{markAsWin(idx);};}document.getElementById('detailOverlay').classList.add('active');}
