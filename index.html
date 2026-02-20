@@ -234,11 +234,11 @@
 
   <div id="dashboardContent" style="display:none;">
     <div class="kpiRow" id="kpiRow">
-      <div class="kpiBox" onclick="openKpiModal('opdrachten')"><div class="kpiLabel">Lopende opdrachten</div><div class="kpiValue" id="kpiWins">0</div><div class="kpiSub" id="kpiWinsSub">—</div></div>
-      <div class="kpiBox" onclick="openKpiModal('leads')"><div class="kpiLabel">Leads in pipeline</div><div class="kpiValue" id="kpiLeads">0</div><div class="kpiSub" id="kpiLeadsSub">—</div></div>
-      <div class="kpiBox" onclick="openKpiModal('bevestigd')"><div class="kpiLabel">Bevestigde omzet</div><div class="kpiValue" id="kpiConfirmed">&#8364; 0</div><div class="kpiSub" id="kpiConfirmedSub">—</div></div>
-      <div class="kpiBox" onclick="openKpiModal('gewogen')"><div class="kpiLabel">Gewogen omzet</div><div class="kpiValue" id="kpiWeighted">&#8364; 0</div><div class="kpiSub" id="kpiWeightedSub">—</div></div>
-      <div class="kpiBox" onclick="openKpiModal('potentieel')"><div class="kpiLabel">Potenti&#235;le omzet</div><div class="kpiValue" id="kpiPotential">&#8364; 0</div><div class="kpiSub" id="kpiPotentialSub">—</div></div>
+      <div class="kpiBox" onclick="openKpiModal('opdrachten')"><div class="kpiLabel">Lopende opdrachten <span class="infoBtn" onclick="event.stopPropagation();showInfo('kpi_opdrachten')" title="Info">&#9432;</span></div><div class="kpiValue" id="kpiWins">0</div><div class="kpiSub" id="kpiWinsSub">—</div></div>
+      <div class="kpiBox" onclick="openKpiModal('leads')"><div class="kpiLabel">Leads in pipeline <span class="infoBtn" onclick="event.stopPropagation();showInfo('kpi_leads')" title="Info">&#9432;</span></div><div class="kpiValue" id="kpiLeads">0</div><div class="kpiSub" id="kpiLeadsSub">—</div></div>
+      <div class="kpiBox" onclick="openKpiModal('bevestigd')"><div class="kpiLabel">Bevestigde omzet <span class="infoBtn" onclick="event.stopPropagation();showInfo('kpi_bevestigd')" title="Info">&#9432;</span></div><div class="kpiValue" id="kpiConfirmed">&#8364; 0</div><div class="kpiSub" id="kpiConfirmedSub">—</div></div>
+      <div class="kpiBox" onclick="openKpiModal('gewogen')"><div class="kpiLabel">Gewogen omzet <span class="infoBtn" onclick="event.stopPropagation();showInfo('kpi_gewogen')" title="Info">&#9432;</span></div><div class="kpiValue" id="kpiWeighted">&#8364; 0</div><div class="kpiSub" id="kpiWeightedSub">—</div></div>
+      <div class="kpiBox" onclick="openKpiModal('potentieel')"><div class="kpiLabel">Potenti&#235;le omzet <span class="infoBtn" onclick="event.stopPropagation();showInfo('kpi_potentieel')" title="Info">&#9432;</span></div><div class="kpiValue" id="kpiPotential">&#8364; 0</div><div class="kpiSub" id="kpiPotentialSub">—</div></div>
     </div>
 
     <div class="card alertSection" id="alertCard">
@@ -553,7 +553,12 @@ const INFO_TEXTS={
   contact:{title:'Contactmomenten',text:'Leads waarvan het eerstvolgende contactmoment verlopen is, vandaag is, of binnen 7 dagen valt. Klik op een item om de details te bekijken en bij te werken.'},
   expiring:{title:'Aflopende opdrachten',text:'Lopende opdrachten (Win) waarvan de einddatum binnen 30 dagen valt of al verlopen is. Dit zijn opdrachten waarvoor mogelijk verlenging of een vervolgopdracht nodig is.'},
   upcoming:{title:'Leads — startdatum bereikt of naderend',text:'Leads in de pipeline waarvan de startdatum al verstreken is of binnen 30 dagen valt. Leads met een verlopen startdatum vereisen actie: win markeren, startdatum bijwerken, of als loss afsluiten.'},
-  incomplete:{title:'Onvolledige gegevens',text:'Items waarbij gegevens niet kloppen: een tarief zonder datum(s), datum(s) zonder tarief, of een uitgebrachte offerte (status 3/4) waar nog essentiële info mist. Zonder beide kan een item niet in de omzetprognose verschijnen. Vul bij benadering in als het exacte bedrag of de exacte datum nog niet bekend is.'}
+  incomplete:{title:'Onvolledige gegevens',text:'Items waarbij gegevens niet kloppen: een tarief zonder datum(s), datum(s) zonder tarief, of een uitgebrachte offerte (status 3/4) waar nog essentiële info mist. Zonder beide kan een item niet in de omzetprognose verschijnen. Vul bij benadering in als het exacte bedrag of de exacte datum nog niet bekend is.'},
+  kpi_opdrachten:{title:'Lopende opdrachten',text:'Alle opdrachten met status "Win". Dit zijn bevestigde opdrachten die momenteel lopen. Het aantal toont hoeveel actieve opdrachten er zijn, met daaronder de totale contractwaarde.'},
+  kpi_leads:{title:'Leads in pipeline',text:'Alle leads die nog open staan (niet gewonnen, verloren of afgerond). Dit zijn potentiële opdrachten in verschillende stadia van het salesproces.'},
+  kpi_bevestigd:{title:'Bevestigde omzet (resterend)',text:'De resterende omzet van lopende opdrachten, berekend vanaf vandaag. Als een opdracht van €120.000 loopt van jan t/m dec en we zijn halverwege februari, dan telt alleen de resterende omzet pro-rata mee. Opdrachten zonder datum tellen volledig mee.'},
+  kpi_gewogen:{title:'Gewogen omzet',text:'De optelsom van: resterende bevestigde omzet (100%) + pipeline-leads gewogen naar winkans. Status 1 = 10%, status 2 = 25%, offerte in concurrentie = 40%, offerte zonder concurrentie = 70%. Dit geeft het meest realistische beeld van de verwachte omzet.'},
+  kpi_potentieel:{title:'Potentiële omzet',text:'De optelsom van: resterende bevestigde omzet + het volledige bedrag van alle pipeline-leads (100%, ongeacht winkans). Dit is het maximale scenario als alle leads gewonnen worden.'}
 };
 function showInfo(type){const info=INFO_TEXTS[type];if(!info)return;const overlay=document.createElement('div');overlay.className='infoPopupOverlay';const popup=document.createElement('div');popup.className='infoPopup';popup.innerHTML=`<h4>${info.title}</h4><p>${info.text}</p><div style="text-align:right;margin-top:12px;"><button onclick="this.closest('.infoPopup').remove();document.querySelector('.infoPopupOverlay').remove();" class="primary" style="padding:8px 18px;">Begrepen</button></div>`;document.body.appendChild(overlay);document.body.appendChild(popup);overlay.onclick=()=>{popup.remove();overlay.remove();};}
 
@@ -669,15 +674,18 @@ function openKpiModal(type){
     }
 
     // Filters row
-    let filtersHtml='<div class="modalFilterRow"><span class="modalFilterToggle'+(filterPartner===''?' active':'')+'" onclick="kpiFilterPartner(\'\')">Iedereen</span>';
-    partners.forEach(p=>{filtersHtml+=`<span class="modalFilterToggle${filterPartner===p?' active':''}" onclick="kpiFilterPartner('${esc(p)}')">${esc(p)}</span>`;});
-    filtersHtml+=`<span style="margin-left:auto;" class="modalFilterToggle${filterHideZero?' active':''}" onclick="kpiToggleZero()">Verberg € 0</span></div>`;
+    let filtersHtml='<div class="modalFilterRow"><span class="modalFilterToggle kpiPartnerBtn'+(filterPartner===''?' active':'')+'" data-partner="">Iedereen</span>';
+    partners.forEach(p=>{filtersHtml+=`<span class="modalFilterToggle kpiPartnerBtn${filterPartner===p?' active':''}" data-partner="${esc(p)}">${esc(p)}</span>`;});
+    filtersHtml+=`<span style="margin-left:auto;" class="modalFilterToggle kpiZeroBtn${filterHideZero?' active':''}">Verberg € 0</span></div>`;
 
     document.getElementById('kpiModalHead').innerHTML=headHtml;
-    // Insert filter row before table
     let existingFilters=document.getElementById('kpiFilterRow');
     if(!existingFilters){existingFilters=document.createElement('div');existingFilters.id='kpiFilterRow';document.getElementById('kpiModalHead').closest('table').parentNode.insertBefore(existingFilters,document.getElementById('kpiModalHead').closest('table'));}
     existingFilters.innerHTML=filtersHtml;
+
+    // Bind click events
+    existingFilters.querySelectorAll('.kpiPartnerBtn').forEach(btn=>{btn.addEventListener('click',()=>{filterPartner=btn.dataset.partner;renderKpiModalContent();});});
+    existingFilters.querySelector('.kpiZeroBtn').addEventListener('click',()=>{filterHideZero=!filterHideZero;renderKpiModalContent();});
 
     document.getElementById('kpiModalBody').innerHTML=filtered.map(l=>{
       const origIdx=leads.indexOf(l);const idx=origIdx>=0?origIdx:leads.findIndex(o=>o.klant===l.klant&&o.omschrijving===l.omschrijving);
@@ -694,13 +702,10 @@ function openKpiModal(type){
     }).join('');
   }
 
-  window.kpiFilterPartner=function(p){filterPartner=p;renderKpiModalContent();};
-  window.kpiToggleZero=function(){filterHideZero=!filterHideZero;renderKpiModalContent();};
-
   renderKpiModalContent();
   document.getElementById('kpiModalOverlay').classList.add('active');
 }
-function closeKpiModal(){document.getElementById('kpiModalOverlay').classList.remove('active');const fr=document.getElementById('kpiFilterRow');if(fr)fr.innerHTML='';}
+function closeKpiModal(){document.getElementById('kpiModalOverlay').classList.remove('active');const fr=document.getElementById('kpiFilterRow');if(fr)fr.remove();}
 
 /* Lead detail modal */
 function openDetail(idx){const l=leads[idx];if(!l)return;document.getElementById('detailTitle').textContent=l.klant;const isWin=l.winloss==='Win';const grid=document.getElementById('detailGrid');grid.innerHTML=`<div class="detailField"><div class="detailLabel">Type</div><div class="detailValue">${isWin?'<span class="statusPill winloss-win">Lopende opdracht</span>':l.winloss==='Afgerond'?'<span class="statusPill winloss-afgerond">Afgerond</span>':l.winloss==='Loss'?'<span class="statusPill winloss-loss">Loss</span>':'<span style="color:var(--pv-orange);">Lead in pipeline</span>'}</div></div><div class="detailField"><div class="detailLabel">Partner</div><div class="detailValue">${esc(l.partner)||'—'}</div></div><div class="detailField full"><div class="detailLabel">Omschrijving</div><div class="detailValue">${esc(l.omschrijving)||'—'}</div></div><div class="detailDivider"></div><div class="detailField"><div class="detailLabel">Status</div><div class="detailValue">${statusPill(l.status)}</div></div><div class="detailField"><div class="detailLabel">Honorarium</div><div class="detailValue" style="font-size:18px;font-weight:900;">${l.honorarium?fmtEuro(l.honorarium):'—'}</div></div><div class="detailField"><div class="detailLabel">Gewogen omzet</div><div class="detailValue">${l.verwacht?fmtEuro(l.verwacht):'—'}</div></div><div class="detailField"><div class="detailLabel">Winkans</div><div class="detailValue">${Math.round(l.winkans*100)}%</div></div><div class="detailDivider"></div><div class="detailField"><div class="detailLabel">Startdatum</div><div class="detailValue">${l.startdatum?fmtDateNL(l.startdatum):'—'}</div></div><div class="detailField"><div class="detailLabel">Einddatum</div><div class="detailValue">${l.einddatum?fmtDateNL(l.einddatum):'—'}</div></div><div class="detailField"><div class="detailLabel">Laatste contact</div><div class="detailValue">${l.laatsteContact?fmtDateNL(l.laatsteContact):'—'}</div></div><div class="detailField"><div class="detailLabel">Eerstvolgende contact</div><div class="detailValue" style="${getContactClass(l.volgendeContact)}">${l.volgendeContact?fmtDateNL(l.volgendeContact):'—'}</div></div>${l.klantType?`<div class="detailField"><div class="detailLabel">Klanttype</div><div class="detailValue">${esc(l.klantType)}</div></div>`:''}${l.opdrachtType?`<div class="detailField"><div class="detailLabel">Opdrachttype</div><div class="detailValue">${esc(l.opdrachtType)}</div></div>`:''}${l.opmerking?`<div class="detailDivider"></div><div class="detailField full"><div class="detailLabel">Opmerking / follow-up</div><div class="detailValue" style="color:var(--text-soft);font-size:13px;line-height:1.5;">${esc(l.opmerking)}</div></div>`:''}`;document.getElementById('detailEditBtn').onclick=()=>{closeDetail();openEditModal(idx);};const lossBtn=document.getElementById('detailLossBtn');const winBtn=document.getElementById('detailWinBtn');winBtn.style.display='none';if(l.winloss==='Loss'){lossBtn.style.display='inline-flex';lossBtn.textContent='↩ Terugzetten als lead';lossBtn.className='primary';lossBtn.onclick=()=>{restoreLead(idx);};}else if(l.winloss==='Afgerond'){lossBtn.style.display='inline-flex';lossBtn.textContent='↩ Heropen als opdracht';lossBtn.className='primary';lossBtn.onclick=()=>{reopenAsWin(idx);closeDetail();};}else if(isWin){lossBtn.style.display='inline-flex';lossBtn.textContent='✓ Opdracht afronden';lossBtn.className='primary';lossBtn.onclick=()=>{markAsCompleted(idx);};}else{lossBtn.style.display='inline-flex';lossBtn.textContent='✗ Markeer als Loss';lossBtn.className='danger';lossBtn.onclick=()=>{markAsLoss(idx);};winBtn.style.display='inline-flex';winBtn.onclick=()=>{markAsWin(idx);};}document.getElementById('detailOverlay').classList.add('active');}
