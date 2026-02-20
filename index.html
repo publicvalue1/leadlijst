@@ -650,28 +650,53 @@ function openKpiModal(type){
   // Build partner filter
   const partners=[...new Set(allItems.map(l=>l.partner).filter(Boolean))].sort();
   let filterPartner='';let filterHideZero=true;
+  let kpiSortKey='_value';let kpiSortAsc=false;
+
+  // Define columns per type
+  let columns=[];
+  if(type==='opdrachten'||type==='bevestigd'){
+    columns=[{key:'klant',label:'Klant',align:'left'},{key:'omschrijving',label:'Opdracht',align:'left'},{key:'partner',label:'Partner',align:'left'},{key:'honorarium',label:'Totaal',align:'right',numeric:true},{key:'_remaining',label:'Resterend',align:'right',numeric:true},{key:'_periode',label:'Periode',align:'left'}];
+  }else if(type==='leads'){
+    columns=[{key:'klant',label:'Klant',align:'left'},{key:'omschrijving',label:'Opdracht',align:'left'},{key:'partner',label:'Partner',align:'left'},{key:'status',label:'Status',align:'left'},{key:'honorarium',label:'Potentieel',align:'right',numeric:true},{key:'verwacht',label:'Gewogen',align:'right',numeric:true}];
+  }else{
+    columns=[{key:'klant',label:'Klant',align:'left'},{key:'omschrijving',label:'Opdracht',align:'left'},{key:'partner',label:'Partner',align:'left'},{key:'_typeLabel',label:'Type',align:'left'},{key:'_value',label:'Waarde',align:'right',numeric:true}];
+  }
+
+  function getKpiSortVal(l,key){
+    if(key==='_value')return calcVal(l);
+    if(key==='_remaining')return Math.round(calcRemaining(l));
+    if(key==='_typeLabel')return l._type==='win'?'0':'1'+(l.status||'');
+    if(key==='_periode')return l.startdatum||'';
+    const v=l[key];return v===undefined?'':v;
+  }
 
   function renderKpiModalContent(){
     let filtered=allItems;
     if(filterPartner)filtered=filtered.filter(l=>l.partner===filterPartner);
     if(filterHideZero)filtered=filtered.filter(l=>calcVal(l)>0);
-    filtered.sort((a,b)=>calcVal(b)-calcVal(a));
-    const totalVal=filtered.reduce((s,l)=>s+calcVal(l),0);
 
+    // Sort
+    filtered=[...filtered];
+    filtered.sort((a,b)=>{
+      let va=getKpiSortVal(a,kpiSortKey),vb=getKpiSortVal(b,kpiSortKey);
+      if(typeof va==='number'&&typeof vb==='number')return kpiSortAsc?va-vb:vb-va;
+      va=String(va||'').toLowerCase();vb=String(vb||'').toLowerCase();
+      return kpiSortAsc?va.localeCompare(vb):vb.localeCompare(va);
+    });
+
+    const totalVal=filtered.reduce((s,l)=>s+calcVal(l),0);
     document.getElementById('kpiModalTitle').textContent=title;
     document.getElementById('kmTotal').textContent=fmtEuro(Math.round(totalVal));
     document.getElementById('kmTotalLabel').textContent=totalLabel;
     document.getElementById('kmCount').textContent=filtered.length;
 
-    // Determine columns based on type
-    let headHtml,isBevestigd=type==='bevestigd';
-    if(isBevestigd){
-      headHtml='<th>Klant</th><th>Opdracht</th><th>Partner</th><th style="text-align:right;">Totaal</th><th style="text-align:right;">Resterend</th><th>Periode</th>';
-    }else if(type==='leads'){
-      headHtml='<th>Klant</th><th>Opdracht</th><th>Partner</th><th>Status</th><th style="text-align:right;">Potentieel</th><th style="text-align:right;">Gewogen</th>';
-    }else{
-      headHtml='<th>Klant</th><th>Opdracht</th><th>Partner</th><th>Type</th><th style="text-align:right;">Waarde</th>';
-    }
+    // Sortable headers
+    const headHtml=columns.map(c=>{
+      const isSorted=kpiSortKey===c.key;
+      const arrow=isSorted?(kpiSortAsc?'▲':'▼'):'⇅';
+      const align=c.align==='right'?'text-align:right;':'';
+      return`<th class="kpiSortTh${isSorted?' sorted':''}" data-sortkey="${c.key}" style="${align}cursor:pointer;">${c.label} <span class="sortArrow">${arrow}</span></th>`;
+    }).join('');
 
     // Filters row
     let filtersHtml='<div class="modalFilterRow"><span class="modalFilterToggle kpiPartnerBtn'+(filterPartner===''?' active':'')+'" data-partner="">Iedereen</span>';
@@ -683,13 +708,16 @@ function openKpiModal(type){
     if(!existingFilters){existingFilters=document.createElement('div');existingFilters.id='kpiFilterRow';document.getElementById('kpiModalHead').closest('table').parentNode.insertBefore(existingFilters,document.getElementById('kpiModalHead').closest('table'));}
     existingFilters.innerHTML=filtersHtml;
 
-    // Bind click events
+    // Bind filter clicks
     existingFilters.querySelectorAll('.kpiPartnerBtn').forEach(btn=>{btn.addEventListener('click',()=>{filterPartner=btn.dataset.partner;renderKpiModalContent();});});
     existingFilters.querySelector('.kpiZeroBtn').addEventListener('click',()=>{filterHideZero=!filterHideZero;renderKpiModalContent();});
 
+    // Bind sort clicks
+    document.querySelectorAll('#kpiModalHead .kpiSortTh').forEach(th=>{th.addEventListener('click',()=>{const key=th.dataset.sortkey;if(kpiSortKey===key)kpiSortAsc=!kpiSortAsc;else{kpiSortKey=key;kpiSortAsc=columns.find(c=>c.key===key)?.numeric?false:true;}renderKpiModalContent();});});
+
     document.getElementById('kpiModalBody').innerHTML=filtered.map(l=>{
       const origIdx=leads.indexOf(l);const idx=origIdx>=0?origIdx:leads.findIndex(o=>o.klant===l.klant&&o.omschrijving===l.omschrijving);
-      if(isBevestigd){
+      if(type==='opdrachten'||type==='bevestigd'){
         const rem=Math.round(calcRemaining(l));
         const periode=l.startdatum&&l.einddatum?fmtDateNL(l.startdatum)+' — '+fmtDateNL(l.einddatum):(l.startdatum?'Vanaf '+fmtDateNL(l.startdatum):'—');
         return`<tr onclick="closeKpiModal();openDetail(${idx})"><td style="font-weight:700;">${esc(l.klant)}</td><td style="color:var(--text-soft);">${esc(l.omschrijving||'')}</td><td>${esc(l.partner||'')}</td><td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--text-soft);">${fmtEuro(l.honorarium)}</td><td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums;">${fmtEuro(rem)}</td><td style="font-size:12px;color:var(--text-soft);white-space:nowrap;">${periode}</td></tr>`;
