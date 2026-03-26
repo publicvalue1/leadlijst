@@ -2296,16 +2296,7 @@ function toast(msg){const el=document.getElementById('toast');el.textContent=msg
    INIT
    ============================================================ */
 if(checkForToken()){onLoginSuccess();}else{
-  // Check for local data
-  if(loadFromLocalStorage()&&leads.length>0){
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('mainApp').style.display='block';
-    setSyncStatus('offline','Lokaal (cache)');
-    populatePartnersFromData();
-    refreshAll();
-  }else{
-    document.getElementById('loginScreen').style.display='flex';
-  }
+  document.getElementById('loginScreen').style.display='flex';
 }
 </script>
 <script src="opdrachten-popup-patch.js"></script>
